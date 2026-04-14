@@ -13,3 +13,6 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Gradle wrapper jar - should not be committed
+gradle/wrapper/gradle-wrapper.jar
