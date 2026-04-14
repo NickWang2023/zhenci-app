@@ -34,36 +34,69 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-gradle-
 
+    - name: Setup Gradle Wrapper
+      run: |
+        echo "=== Setting up Gradle Wrapper ==="
+        # 下载 Gradle Wrapper
+        GRADLE_VERSION=8.5
+        mkdir -p gradle/wrapper
+        
+        # 创建 gradle-wrapper.properties
+        cat > gradle/wrapper/gradle-wrapper.properties << 'EOF'
+        distributionBase=GRADLE_USER_HOME
+        distributionPath=wrapper/dists
+        distributionUrl=https\://services.gradle.org/distributions/gradle-8.5-bin.zip
+        networkTimeout=10000
+        validateDistributionUrl=true
+        zipStoreBase=GRADLE_USER_HOME
+        zipStorePath=wrapper/dists
+        EOF
+        
+        # 下载 wrapper jar
+        curl -L -o gradle/wrapper/gradle-wrapper.jar \
+          "https://raw.githubusercontent.com/gradle/gradle/v8.5.0/gradle/wrapper/gradle-wrapper.jar"
+        
+        # 创建 gradlew 脚本
+        cat > gradlew << 'EOF'
+        #!/bin/sh
+        exec "$(dirname "$0")/gradle/wrapper/gradle-wrapper.jar" "$@"
+        EOF
+        chmod +x gradlew
+        
+        echo "=== Gradle Wrapper Setup Complete ==="
+        ls -la gradle/wrapper/
+        cat gradle/wrapper/gradle-wrapper.properties
+        
     - name: Check project structure
       run: |
         echo "=== Project Structure ==="
         ls -la
         echo "=== App Directory ==="
         ls -la app/
-        echo "=== Gradle Wrapper ==="
-        ls -la gradlew
-        cat gradle/wrapper/gradle-wrapper.properties
+        echo "=== Source Files ==="
+        find app/src -name "*.kt" | head -20
         
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
         
-    - name: Build Debug APK with Gradle Wrapper
+    - name: Build Debug APK with Gradle
       run: |
-        ./gradlew :app:assembleDebug --no-daemon --info 2>&1 | tee build.log
-        echo "Build exit code: ${PIPESTATUS[0]}"
+        ./gradlew :app:assembleDebug --no-daemon --stacktrace 2>&1 | tee build.log
+        BUILD_EXIT_CODE=${PIPESTATUS[0]}
+        echo "Build exit code: $BUILD_EXIT_CODE"
+        exit $BUILD_EXIT_CODE
       continue-on-error: true
         
-    - name: Show full build log
+    - name: Show build log
       run: |
-        echo "=== FULL BUILD LOG ==="
-        cat build.log
+        echo "=== BUILD LOG (last 200 lines) ==="
+        tail -200 build.log
         echo "=== END LOG ==="
         
     - name: Check all build outputs
       run: |
         echo "=== Current Directory ==="
         pwd
-        ls -la
         echo "=== Looking for all APK files ==="
         find . -name "*.apk" -type f 2>/dev/null
         echo "=== Looking for build directory ==="
