@@ -1,0 +1,48 @@
+<resources>
+    <string name="app_name">针刺</string>
+    <string name="app_description">自律自强，掌控每日</string>
+    
+    <!-- Navigation -->
+    <string name="nav_today">今日</string>
+    <string name="nav_templates">模板</string>
+    <string name="nav_settings">设置</string>
+    
+    <!-- Actions -->
+    <string name="action_add">添加</string>
+    <string name="action_save">保存</string>
+    <string name="action_delete">删除</string>
+    <string name="action_edit">编辑</string>
+    <string name="action_import">导入</string>
+    <string name="action_export">导出</string>
+    <string name="action_start">开始</string>
+    <string name="action_stop">停止</string>
+    
+    <!-- Task -->
+    <string name="task_title">任务标题</string>
+    <string name="task_time">提醒时间</string>
+    <string name="task_description">任务描述</string>
+    <string name="task_type_work">工作</string>
+    <string name="task_type_life">生活</string>
+    <string name="task_type_other">其他</string>
+    
+    <!-- Template -->
+    <string name="template_name">模板名称</string>
+    <string name="template_default_name">默认日程</string>
+    <string name="template_create">创建模板</string>
+    <string name="template_edit">编辑模板</string>
+    <string name="template_import">导入模板</string>
+    <string name="template_export">导出模板</string>
+    
+    <!-- Messages -->
+    <string name="msg_task_added">任务已添加</string>
+    <string name="msg_task_updated">任务已更新</string>
+    <string name="msg_task_deleted">任务已删除</string>
+    <string name="msg_template_saved">模板已保存</string>
+    <string name="msg_reminder_started">提醒已启动</string>
+    <string name="msg_reminder_stopped">提醒已停止</string>
+    <string name="msg_no_tasks">暂无任务，点击添加</string>
+    
+    <!-- Notifications -->
+    <string name="notification_channel_name">针刺提醒</string>
+    <string name="notification_channel_desc">每日任务定时提醒</string>
+</resources>

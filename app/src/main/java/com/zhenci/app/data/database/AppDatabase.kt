@@ -1,0 +1,36 @@
+package com.zhenci.app.data.database
+
+import android.content.Context
+import androidx.room.Database
+import androidx.room.Room
+import androidx.room.RoomDatabase
+import com.zhenci.app.data.entity.Task
+import com.zhenci.app.data.entity.Template
+
+@Database(
+    entities = [Task::class, Template::class, UserStats::class],
+    version = 2,
+    exportSchema = false
+)
+abstract class AppDatabase : RoomDatabase() {
+    abstract fun taskDao(): TaskDao
+    abstract fun templateDao(): TemplateDao
+    abstract fun userStatsDao(): UserStatsDao
+
+    companion object {
+        @Volatile
+        private var INSTANCE: AppDatabase? = null
+
+        fun getDatabase(context: Context): AppDatabase {
+            return INSTANCE ?: synchronized(this) {
+                val instance = Room.databaseBuilder(
+                    context.applicationContext,
+                    AppDatabase::class.java,
+                    "zhenci_database"
+                ).build()
+                INSTANCE = instance
+                instance
+            }
+        }
+    }
+}
