@@ -7,9 +7,6 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -27,25 +24,30 @@ jobs:
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3
       
-    - name: Setup Gradle
-      uses: gradle/gradle-build-action@v3
-      with:
-        gradle-version: 8.5
-        
-    - name: Build Debug APK with Gradle
-      run: gradle assembleDebug --stacktrace
+    - name: Make gradlew executable
+      run: chmod +x gradlew
       
-    - name: Find and Upload APK
+    - name: Build with Gradle Wrapper
       run: |
-        echo "Searching for APK files..."
-        find . -name "*.apk" -type f
-        mkdir -p output
-        find . -name "*.apk" -type f -exec cp {} output/ \;
-        ls -la output/
+        export ANDROID_HOME=$ANDROID_SDK_ROOT
+        ./gradlew clean
+        ./gradlew assembleDebug --info --stacktrace 2>&1 | tee build.log
       
-    - name: Upload APK
+    - name: Check build output
+      run: |
+        echo "=== Build log ==="
+        cat build.log | tail -100
+        echo "=== Looking for APK ==="
+        find . -name "*.apk" -type f 2>/dev/null || echo "No APK found"
+        echo "=== Build directory ==="
+        ls -la app/build/outputs/apk/ 2>/dev/null || echo "No APK directory"
+      
+    - name: Upload Debug APK
       uses: actions/upload-artifact@v4
+      if: always()
       with:
-        name: zhenci-apk
-        path: output/*.apk
+        name: app-debug
+        path: |
+          app/build/outputs/apk/debug/*.apk
+          build.log
         if-no-files-found: warn
