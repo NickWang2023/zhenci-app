@@ -115,8 +115,8 @@ fun StatsScreen(
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("• 点击"执行"按钮：+1分")
-                    Text("• 点击"关闭"按钮：不加分")
+                    Text("• 点击「执行」按钮：+1分")
+                    Text("• 点击「关闭」按钮：不加分")
                     Text("• 连续每日执行：保持连续天数")
                 }
             }

@@ -80,7 +80,8 @@ class AlarmReceiver : BroadcastReceiver() {
                         .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                         .build()
                 )
-                setDataSource(context, Uri.parse("android.resource://${context.packageName}/${android.R.raw.notification}"))
+                // 使用系统默认通知音效
+                setDataSource(context, android.provider.Settings.System.DEFAULT_NOTIFICATION_URI)
                 prepare()
                 start()
             }

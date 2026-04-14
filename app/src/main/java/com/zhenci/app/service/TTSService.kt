@@ -2,9 +2,9 @@ package com.zhenci.app.service
 
 import android.app.Service
 import android.content.Intent
+import android.os.Bundle
 import android.os.IBinder
 import android.speech.tts.TextToSpeech
-import android.speech.tts.UtteranceProgressListener
 import java.util.*
 
 class TTSService : Service(), TextToSpeech.OnInitListener {
