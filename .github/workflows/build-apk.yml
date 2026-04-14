@@ -34,38 +34,17 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-gradle-
 
-    - name: Setup Gradle Wrapper
+    - name: Setup Gradle
       run: |
-        echo "=== Setting up Gradle Wrapper ==="
-        # 下载 Gradle Wrapper
+        echo "=== Installing Gradle ==="
+        # 下载并安装 Gradle
         GRADLE_VERSION=8.5
-        mkdir -p gradle/wrapper
-        
-        # 创建 gradle-wrapper.properties
-        cat > gradle/wrapper/gradle-wrapper.properties << 'EOF'
-        distributionBase=GRADLE_USER_HOME
-        distributionPath=wrapper/dists
-        distributionUrl=https\://services.gradle.org/distributions/gradle-8.5-bin.zip
-        networkTimeout=10000
-        validateDistributionUrl=true
-        zipStoreBase=GRADLE_USER_HOME
-        zipStorePath=wrapper/dists
-        EOF
-        
-        # 下载 wrapper jar
-        curl -L -o gradle/wrapper/gradle-wrapper.jar \
-          "https://raw.githubusercontent.com/gradle/gradle/v8.5.0/gradle/wrapper/gradle-wrapper.jar"
-        
-        # 创建 gradlew 脚本
-        cat > gradlew << 'EOF'
-        #!/bin/sh
-        exec "$(dirname "$0")/gradle/wrapper/gradle-wrapper.jar" "$@"
-        EOF
-        chmod +x gradlew
-        
-        echo "=== Gradle Wrapper Setup Complete ==="
-        ls -la gradle/wrapper/
-        cat gradle/wrapper/gradle-wrapper.properties
+        wget -q "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip" -O /tmp/gradle.zip
+        unzip -q /tmp/gradle.zip -d /tmp/
+        export PATH="/tmp/gradle-${GRADLE_VERSION}/bin:$PATH"
+        echo "/tmp/gradle-${GRADLE_VERSION}/bin" >> $GITHUB_PATH
+        gradle --version
+        echo "=== Gradle Setup Complete ==="
         
     - name: Check project structure
       run: |
@@ -76,12 +55,9 @@ jobs:
         echo "=== Source Files ==="
         find app/src -name "*.kt" | head -20
         
-    - name: Grant execute permission for gradlew
-      run: chmod +x gradlew
-        
     - name: Build Debug APK with Gradle
       run: |
-        ./gradlew :app:assembleDebug --no-daemon --stacktrace 2>&1 | tee build.log
+        gradle :app:assembleDebug --no-daemon --stacktrace 2>&1 | tee build.log
         BUILD_EXIT_CODE=${PIPESTATUS[0]}
         echo "Build exit code: $BUILD_EXIT_CODE"
         exit $BUILD_EXIT_CODE
