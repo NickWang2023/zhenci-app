@@ -64,15 +64,6 @@ jobs:
         chmod +x gradlew
         
         echo "=== Gradle Wrapper Setup Complete ==="
-        ls -la gradle/wrapper/
-        cat gradlew
-        
-    - name: Check project structure
-      run: |
-        echo "=== Project Structure ==="
-        ls -la
-        echo "=== Source Files ==="
-        find app/src -name "*.kt" | wc -l
         
     - name: Build Debug APK
       run: |
@@ -89,6 +80,8 @@ jobs:
         echo "=== END LOG ==="
         echo "=== Looking for APK files ==="
         find . -name "*.apk" -type f 2>/dev/null || echo "No APK files found"
+        echo "=== APK directory ==="
+        ls -la app/build/outputs/apk/debug/ 2>/dev/null || echo "Directory not found"
       
     - name: Upload build log
       uses: actions/upload-artifact@v4
@@ -103,6 +96,5 @@ jobs:
       if: always()
       with:
         name: zhenci-debug-apk
-        path: |
-          **/*.apk
+        path: app/build/outputs/apk/debug/*.apk
         if-no-files-found: ignore
