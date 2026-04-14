@@ -24,20 +24,14 @@ jobs:
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3
       
-    - name: Check Gradle wrapper
+    - name: Install Gradle
       run: |
-        ls -la gradlew
-        ls -la gradle/wrapper/
-        file gradle/wrapper/gradle-wrapper.jar
-        
-    - name: Make gradlew executable
-      run: chmod +x gradlew
+        sudo apt-get update
+        sudo apt-get install -y gradle
+        gradle --version
       
-    - name: Test Gradle
-      run: ./gradlew --version
-      
-    - name: Build Debug APK
-      run: ./gradlew assembleDebug --stacktrace --info
+    - name: Build with system Gradle
+      run: gradle assembleDebug --stacktrace
       
     - name: Find APK
       run: find . -name "*.apk" -type f
