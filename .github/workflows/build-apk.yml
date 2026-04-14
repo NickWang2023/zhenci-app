@@ -33,31 +33,47 @@ jobs:
         key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
         restore-keys: |
           ${{ runner.os }}-gradle-
+
+    - name: Check project structure
+      run: |
+        echo "=== Project Structure ==="
+        ls -la
+        echo "=== App Directory ==="
+        ls -la app/
+        echo "=== Gradle Wrapper ==="
+        ls -la gradlew
+        cat gradle/wrapper/gradle-wrapper.properties
         
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
         
     - name: Build Debug APK with Gradle Wrapper
       run: |
-        ./gradlew :app:assembleDebug --no-daemon --stacktrace 2>&1 | tee build.log
+        ./gradlew :app:assembleDebug --no-daemon --info 2>&1 | tee build.log
         echo "Build exit code: ${PIPESTATUS[0]}"
       continue-on-error: true
         
-    - name: Show build log
+    - name: Show full build log
       run: |
-        echo "=== BUILD LOG (last 100 lines) ==="
-        tail -100 build.log
+        echo "=== FULL BUILD LOG ==="
+        cat build.log
         echo "=== END LOG ==="
         
-    - name: Check APK files
+    - name: Check all build outputs
       run: |
-        echo "=== Looking for APK files ==="
-        find . -name "*.apk" -type f 2>/dev/null | head -20
-        echo "=== APK directory contents ==="
-        ls -laR app/build/outputs/apk/ 2>/dev/null || echo "APK directory not found"
+        echo "=== Current Directory ==="
+        pwd
+        ls -la
+        echo "=== Looking for all APK files ==="
+        find . -name "*.apk" -type f 2>/dev/null
+        echo "=== Looking for build directory ==="
+        find . -type d -name "build" 2>/dev/null | head -10
+        echo "=== App build directory ==="
+        ls -laR app/build/ 2>/dev/null || echo "app/build not found"
       
     - name: Upload build log
       uses: actions/upload-artifact@v4
+      if: always()
       with:
         name: build-log
         path: build.log
@@ -69,8 +85,7 @@ jobs:
       with:
         name: zhenci-debug-apk
         path: |
-          app/build/outputs/apk/debug/*.apk
-          app/build/outputs/apk/release/*.apk
+          **/*.apk
         if-no-files-found: ignore
         
     - name: Upload build outputs
