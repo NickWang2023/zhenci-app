@@ -6,6 +6,7 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import com.zhenci.app.data.entity.Task
 import com.zhenci.app.data.entity.Template
+import com.zhenci.app.data.entity.UserStats
 
 @Database(
     entities = [Task::class, Template::class, UserStats::class],
