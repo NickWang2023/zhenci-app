@@ -24,26 +24,27 @@ jobs:
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3
       
+    - name: Check Gradle wrapper
+      run: |
+        ls -la gradlew
+        ls -la gradle/wrapper/
+        file gradle/wrapper/gradle-wrapper.jar
+        
     - name: Make gradlew executable
       run: chmod +x gradlew
       
+    - name: Test Gradle
+      run: ./gradlew --version
+      
     - name: Build Debug APK
-      run: |
-        ./gradlew assembleDebug --stacktrace 2>&1 | tee build.log || true
-        echo "=== BUILD LOG ==="
-        cat build.log
-        echo "=== END LOG ==="
+      run: ./gradlew assembleDebug --stacktrace --info
       
-    - name: Check build result
-      run: |
-        echo "Build directory contents:"
-        ls -la app/build/ 2>/dev/null || echo "No build directory"
-        echo "APK files:"
-        find . -name "*.apk" 2>/dev/null || echo "No APK files"
+    - name: Find APK
+      run: find . -name "*.apk" -type f
       
-    - name: Upload build log
+    - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: build-log
-        path: build.log
-        if-no-files-found: ignore
+        name: zhenci-apk
+        path: app/build/outputs/apk/debug/*.apk
+        if-no-files-found: warn
