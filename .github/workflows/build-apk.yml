@@ -24,21 +24,22 @@ jobs:
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3
       
-    - name: Install Gradle
+    - name: Fix Gradle Wrapper
       run: |
-        sudo apt-get update
-        sudo apt-get install -y gradle
-        gradle --version
+        rm -f gradle/wrapper/gradle-wrapper.jar
+        curl -L -o gradle/wrapper/gradle-wrapper.jar https://raw.githubusercontent.com/gradle/gradle/v8.5.0/gradle/wrapper/gradle-wrapper.jar
+        chmod +x gradlew
+        
+    - name: Build Debug APK
+      run: ./gradlew :app:assembleDebug --stacktrace
       
-    - name: Build with system Gradle
-      run: gradle assembleDebug --stacktrace
-      
-    - name: Find APK
-      run: find . -name "*.apk" -type f
+    - name: Check APK
+      run: |
+        ls -lh app/build/outputs/apk/debug/
+        file app/build/outputs/apk/debug/app-debug.apk
       
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
         name: zhenci-apk
-        path: app/build/outputs/apk/debug/*.apk
-        if-no-files-found: warn
+        path: app/build/outputs/apk/debug/app-debug.apk
