@@ -24,35 +24,22 @@ jobs:
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3
       
-    - name: Fix Gradle Wrapper
-      run: |
-        rm -f gradle/wrapper/gradle-wrapper.jar
-        curl -L -o gradle/wrapper/gradle-wrapper.jar https://raw.githubusercontent.com/gradle/gradle/v8.5.0/gradle/wrapper/gradle-wrapper.jar
-        chmod +x gradlew
-        
-    - name: Build Debug APK
-      run: |
-        ./gradlew :app:assembleDebug --stacktrace 2>&1 | tee build.log
-        echo "Exit code: ${PIPESTATUS[0]}"
-      continue-on-error: true
-      
-    - name: Upload build log
-      uses: actions/upload-artifact@v4
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v3
       with:
-        name: build-log
-        path: build.log
-        if-no-files-found: ignore
+        gradle-version: 8.5
+        
+    - name: Build Debug APK with Gradle
+      run: gradle :app:assembleDebug --stacktrace
       
-    - name: Check build directory
+    - name: Check APK
       run: |
-        echo "=== Build directory structure ==="
-        find app/build -type d 2>/dev/null | head -20 || echo "No build directory"
-        echo "=== All APK files ==="
+        ls -lh app/build/outputs/apk/debug/ 2>/dev/null || echo "APK directory not found"
         find . -name "*.apk" 2>/dev/null || echo "No APK files"
       
-    - name: Upload APK if exists
+    - name: Upload APK
       uses: actions/upload-artifact@v4
-      if: hashFiles('app/build/outputs/apk/debug/app-debug.apk') != ''
       with:
         name: zhenci-apk
-        path: app/build/outputs/apk/debug/app-debug.apk
+        path: app/build/outputs/apk/debug/*.apk
+        if-no-files-found: warn
