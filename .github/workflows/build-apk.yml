@@ -27,23 +27,23 @@ jobs:
     - name: Make gradlew executable
       run: chmod +x gradlew
       
-    - name: Check files
-      run: |
-        ls -la
-        ls -la gradle/wrapper/
-        cat gradle/wrapper/gradle-wrapper.properties
-      
     - name: Build Debug APK
-      run: ./gradlew assembleDebug --stacktrace
+      run: |
+        ./gradlew assembleDebug --stacktrace 2>&1 | tee build.log || true
+        echo "=== BUILD LOG ==="
+        cat build.log
+        echo "=== END LOG ==="
       
-    - name: List all generated files
-      run: find . -type f -name "*.apk" -o -name "*.aab" 2>/dev/null | head -20
+    - name: Check build result
+      run: |
+        echo "Build directory contents:"
+        ls -la app/build/ 2>/dev/null || echo "No build directory"
+        echo "APK files:"
+        find . -name "*.apk" 2>/dev/null || echo "No APK files"
       
-    - name: Upload APK
+    - name: Upload build log
       uses: actions/upload-artifact@v4
       with:
-        name: zhenci-apk
-        path: |
-          **/*.apk
-          **/*.aab
-        if-no-files-found: warn
+        name: build-log
+        path: build.log
+        if-no-files-found: ignore
