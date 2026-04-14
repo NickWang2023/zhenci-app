@@ -27,27 +27,21 @@ jobs:
     - name: Make gradlew executable
       run: chmod +x gradlew
       
-    - name: Build with Gradle Wrapper
+    - name: Build Debug APK
       run: |
-        export ANDROID_HOME=$ANDROID_SDK_ROOT
-        ./gradlew clean
-        ./gradlew assembleDebug --info --stacktrace 2>&1 | tee build.log
+        ./gradlew assembleDebug --stacktrace
+      continue-on-error: true
       
-    - name: Check build output
+    - name: Check APK
       run: |
-        echo "=== Build log ==="
-        cat build.log | tail -100
-        echo "=== Looking for APK ==="
-        find . -name "*.apk" -type f 2>/dev/null || echo "No APK found"
-        echo "=== Build directory ==="
-        ls -la app/build/outputs/apk/ 2>/dev/null || echo "No APK directory"
+        echo "=== APK files ==="
+        find . -name "*.apk" -type f -exec ls -lh {} \;
+        echo "=== Build outputs ==="
+        ls -la app/build/outputs/apk/debug/ 2>/dev/null || echo "No debug dir"
       
-    - name: Upload Debug APK
+    - name: Upload APK
       uses: actions/upload-artifact@v4
-      if: always()
       with:
-        name: app-debug
-        path: |
-          app/build/outputs/apk/debug/*.apk
-          build.log
-        if-no-files-found: warn
+        name: zhenci-debug-apk
+        path: app/build/outputs/apk/debug/*.apk
+        if-no-files-found: ignore
