@@ -56,6 +56,9 @@ class ReminderWorker(
             // 等待语音播报完成
             delay(10000)
             
+            // 重新设置明天的闹钟（用于每日重复任务）
+            rescheduleForTomorrow(taskId, content)
+            
             return Result.success()
         } catch (e: Exception) {
             e.printStackTrace()
@@ -107,6 +110,28 @@ class ReminderWorker(
             android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
                 mediaPlayer.release()
             }, 3000)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun rescheduleForTomorrow(taskId: Long, content: String) {
+        try {
+            val scheduler = AlarmScheduler(applicationContext)
+            // 从 content 解析时间 (格式: "HH:MM 内容")
+            val timePart = content.substringBefore(" ")
+            val taskContent = content.substringAfter(" ", "针刺提醒")
+            val hour = timePart.substringBefore(":").toIntOrNull() ?: 9
+            val minute = timePart.substringAfter(":").toIntOrNull() ?: 0
+
+            val task = com.zhenci.app.data.entity.Task(
+                id = taskId,
+                content = taskContent,
+                hour = hour,
+                minute = minute,
+                isActive = true
+            )
+            scheduler.scheduleDailyRepeating(task)
         } catch (e: Exception) {
             e.printStackTrace()
         }

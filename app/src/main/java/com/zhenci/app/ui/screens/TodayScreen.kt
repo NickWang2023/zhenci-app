@@ -23,6 +23,7 @@ import com.zhenci.app.ui.theme.LifeTaskColor
 import com.zhenci.app.ui.theme.OtherTaskColor
 import com.zhenci.app.ui.theme.WorkTaskColor
 import com.zhenci.app.ui.components.ReminderDialog
+import com.zhenci.app.service.AlarmScheduler
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.*
@@ -60,6 +61,9 @@ fun TodayScreen() {
     // 积分状态（实际应从数据库读取）
     var totalScore by remember { mutableStateOf(0) }
     var todayScore by remember { mutableStateOf(0) }
+    
+    // 闹钟调度器
+    val alarmScheduler = remember { AlarmScheduler(context) }
     
     // 计算完成率
     val completedCount = tasks.count { it.isCompleted }
@@ -130,9 +134,16 @@ fun TodayScreen() {
                                 }.toMutableList()
                             },
                             onToggleEnable = {
+                                val newEnabledState = !task.isEnabled
                                 tasks = tasks.map { 
-                                    if (it.id == task.id) it.copy(isEnabled = !it.isEnabled) else it 
+                                    if (it.id == task.id) it.copy(isEnabled = newEnabledState) else it 
                                 }.toMutableList()
+                                // 更新闹钟状态
+                                if (newEnabledState) {
+                                    alarmScheduler.scheduleTask(task.copy(isEnabled = true))
+                                } else {
+                                    alarmScheduler.cancelTask(task.id)
+                                }
                             },
                             onEdit = {
                                 editingTask = task
@@ -157,7 +168,12 @@ fun TodayScreen() {
             onDismiss = { showAddDialog = false },
             onConfirm = { newTask ->
                 val newId = (tasks.maxOfOrNull { it.id } ?: 0) + 1
-                tasks.add(newTask.copy(id = newId))
+                val taskWithId = newTask.copy(id = newId)
+                tasks.add(taskWithId)
+                // 如果启用了提醒，设置闹钟
+                if (taskWithId.isEnabled) {
+                    alarmScheduler.scheduleTask(taskWithId)
+                }
                 showAddDialog = false
             }
         )
@@ -176,6 +192,11 @@ fun TodayScreen() {
                 tasks = tasks.map { 
                     if (it.id == updatedTask.id) updatedTask else it 
                 }.toMutableList()
+                // 重新设置闹钟
+                alarmScheduler.cancelTask(updatedTask.id)
+                if (updatedTask.isEnabled) {
+                    alarmScheduler.scheduleTask(updatedTask)
+                }
                 showEditDialog = false
                 editingTask = null
             }
@@ -194,7 +215,10 @@ fun TodayScreen() {
             confirmButton = {
                 TextButton(
                     onClick = {
-                        tasks.removeAll { it.id == deletingTask?.id }
+                        deletingTask?.let { task ->
+                            alarmScheduler.cancelTask(task.id)
+                            tasks.removeAll { it.id == task.id }
+                        }
                         showDeleteConfirm = false
                         deletingTask = null
                     },
