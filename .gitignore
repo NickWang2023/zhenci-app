@@ -13,3 +13,6 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Gradle wrapper
+gradle/wrapper/gradle-wrapper.jar
