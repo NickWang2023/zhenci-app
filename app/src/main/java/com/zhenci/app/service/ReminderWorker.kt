@@ -129,7 +129,7 @@ class ReminderWorker(
                 content = taskContent,
                 hour = hour,
                 minute = minute,
-                isActive = true
+                isEnabled = true
             )
             scheduler.scheduleDailyRepeating(task)
         } catch (e: Exception) {
