@@ -11,6 +11,7 @@ import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import android.util.Log
 import com.zhenci.app.MainActivity
 import com.zhenci.app.ZhenciApplication
 import kotlinx.coroutines.delay
@@ -20,9 +21,14 @@ class ReminderWorker(
     params: WorkerParameters
 ) : CoroutineWorker(context, params) {
 
+    companion object {
+        private const val TAG = "ReminderWorker"
+    }
+
     override suspend fun doWork(): Result {
         val taskId = inputData.getLong("task_id", -1)
         val content = inputData.getString("task_content") ?: "针刺提醒"
+        Log.d(TAG, "doWork: 开始执行任务 $taskId - $content")
         
         // 唤醒屏幕
         val powerManager = applicationContext.getSystemService(Context.POWER_SERVICE) as PowerManager
@@ -33,14 +39,17 @@ class ReminderWorker(
         wakeLock.acquire(60000) // 延长到60秒，确保语音播报完成
 
         try {
+            Log.d(TAG, "doWork: 准备显示通知")
             // 显示通知
             showNotification(applicationContext, "针刺提醒", content)
+            Log.d(TAG, "doWork: 通知已显示")
             
             // 播放提示音
             playAlarmSound(applicationContext)
             
             // 语音播报 - 使用前台服务确保不被杀死
             val message = content.take(50) // 增加到50字
+            Log.d(TAG, "doWork: 准备启动 TTS 服务，消息: $message")
             val ttsIntent = Intent(applicationContext, TTSService::class.java).apply {
                 putExtra("message", message)
                 putExtra("task_id", taskId)
@@ -52,6 +61,7 @@ class ReminderWorker(
             } else {
                 applicationContext.startService(ttsIntent)
             }
+            Log.d(TAG, "doWork: TTS 服务已启动")
             
             // 等待语音播报完成
             delay(10000)

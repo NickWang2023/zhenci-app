@@ -5,6 +5,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.util.Log
 import androidx.work.Data
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
@@ -15,10 +16,15 @@ import java.util.concurrent.TimeUnit
 
 class AlarmScheduler(private val context: Context) {
 
+    companion object {
+        private const val TAG = "AlarmScheduler"
+    }
+
     private val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
     private val workManager = WorkManager.getInstance(context)
 
     fun scheduleTask(task: Task) {
+        Log.d(TAG, "scheduleTask: 开始设置任务 ${task.id} - ${task.content} at ${task.hour}:${task.minute}")
         val calendar = Calendar.getInstance().apply {
             set(Calendar.HOUR_OF_DAY, task.hour)
             set(Calendar.MINUTE, task.minute)
@@ -50,6 +56,7 @@ class AlarmScheduler(private val context: Context) {
             ExistingWorkPolicy.REPLACE,
             workRequest
         )
+        Log.d(TAG, "scheduleTask: WorkManager 任务已设置，延迟 ${delayMillis}ms")
 
         // 同时设置 AlarmManager 作为备份（确保精确时间）
         val intent = Intent(context, AlarmReceiver::class.java).apply {
@@ -66,6 +73,7 @@ class AlarmScheduler(private val context: Context) {
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             if (alarmManager.canScheduleExactAlarms()) {
+                Log.d(TAG, "scheduleTask: 使用 setExactAndAllowWhileIdle")
                 alarmManager.setExactAndAllowWhileIdle(
                     AlarmManager.RTC_WAKEUP,
                     calendar.timeInMillis,
@@ -73,6 +81,7 @@ class AlarmScheduler(private val context: Context) {
                 )
             } else {
                 // 没有精确闹钟权限时，使用 setAndAllowWhileIdle
+                Log.w(TAG, "scheduleTask: 没有精确闹钟权限，使用 setAndAllowWhileIdle")
                 alarmManager.setAndAllowWhileIdle(
                     AlarmManager.RTC_WAKEUP,
                     calendar.timeInMillis,
@@ -80,12 +89,14 @@ class AlarmScheduler(private val context: Context) {
                 )
             }
         } else {
+            Log.d(TAG, "scheduleTask: Android < 12，使用 setExactAndAllowWhileIdle")
             alarmManager.setExactAndAllowWhileIdle(
                 AlarmManager.RTC_WAKEUP,
                 calendar.timeInMillis,
                 pendingIntent
             )
         }
+        Log.d(TAG, "scheduleTask: AlarmManager 闹钟已设置，时间戳 ${calendar.timeInMillis}")
     }
 
     fun cancelTask(taskId: Long) {
