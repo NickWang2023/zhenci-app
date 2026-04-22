@@ -94,14 +94,14 @@ class TTSService : Service(), TextToSpeech.OnInitListener {
             tts?.setSpeechRate(0.9f)
             tts?.setPitch(1.0f)
             
-            // 设置音频流类型为闹钟，确保有声音
+            // 设置音频流类型为媒体，确保有声音（华为系统对 ALARM 流有限制）
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                 val audioAttributes = AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_ALARM)
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
                     .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
                     .build()
                 tts?.setAudioAttributes(audioAttributes)
-                Log.d(TAG, "onInit: 已设置音频属性为 ALARM")
+                Log.d(TAG, "onInit: 已设置音频属性为 MEDIA")
             }
 
             // 设置播报完成监听器
@@ -148,29 +148,27 @@ class TTSService : Service(), TextToSpeech.OnInitListener {
             tts?.stop()
         }
 
-        // 检查并调整音量
+        // 检查音量（仅记录日志，不修改）
         val audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
-        val currentVolume = audioManager.getStreamVolume(AudioManager.STREAM_ALARM)
-        val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_ALARM)
-        Log.d(TAG, "speak: 闹钟音量 $currentVolume / $maxVolume")
+        val currentVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+        val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+        Log.d(TAG, "speak: 媒体音量 $currentVolume / $maxVolume")
         
-        // 如果音量为0，尝试设置为最大音量的一半
         if (currentVolume == 0) {
-            Log.w(TAG, "speak: 闹钟音量为0，尝试调整")
-            audioManager.setStreamVolume(AudioManager.STREAM_ALARM, maxVolume / 2, 0)
+            Log.w(TAG, "speak: 警告：媒体音量为0，请在系统设置中调高音量")
         }
         
         // 检查是否静音
         val ringerMode = audioManager.ringerMode
         Log.d(TAG, "speak: 铃声模式=$ringerMode (0=静音, 1=震动, 2=正常)")
         if (ringerMode == AudioManager.RINGER_MODE_SILENT || ringerMode == AudioManager.RINGER_MODE_VIBRATE) {
-            Log.w(TAG, "speak: 设备处于静音/震动模式，尝试切换到正常模式")
-            audioManager.ringerMode = AudioManager.RINGER_MODE_NORMAL
+            Log.w(TAG, "speak: 警告：设备处于静音/震动模式，请切换到正常模式")
         }
 
         val params = Bundle()
         params.putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, "zhenci_tts")
-        params.putInt(TextToSpeech.Engine.KEY_PARAM_STREAM, AudioManager.STREAM_ALARM)
+        // 使用音乐流而不是闹钟流，华为系统对闹钟流有限制
+        params.putInt(TextToSpeech.Engine.KEY_PARAM_STREAM, AudioManager.STREAM_MUSIC)
 
         val result = tts?.speak(message, TextToSpeech.QUEUE_FLUSH, params, "zhenci_tts")
         Log.d(TAG, "speak: speak() 返回结果=$result")
