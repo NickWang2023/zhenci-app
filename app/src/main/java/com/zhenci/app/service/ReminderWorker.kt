@@ -44,7 +44,7 @@ class ReminderWorker(
         try {
             Log.d(TAG, "doWork: 准备显示通知")
             // 显示通知
-            showNotification(applicationContext, "针刺提醒", content)
+            showNotification(applicationContext, "针刺提醒", content, taskId)
             Log.d(TAG, "doWork: 通知已显示")
             
             // 播放提示音
@@ -72,8 +72,7 @@ class ReminderWorker(
         }
     }
 
-    private fun showNotification(context: Context, title: String, description: String) {
-        val taskId = inputData.getLong("task_id", 0)
+    private fun showNotification(context: Context, title: String, description: String, taskId: Long) {
         val notificationId = taskId.toInt()
         
         val intent = Intent(context, MainActivity::class.java).apply {
