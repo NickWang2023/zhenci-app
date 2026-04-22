@@ -66,11 +66,21 @@ class TTSService : Service(), TextToSpeech.OnInitListener {
         if (status == TextToSpeech.SUCCESS) {
             Log.d(TAG, "onInit: TTS 初始化成功")
             
+            // 获取默认引擎信息
+            val defaultEngine = tts?.defaultEngine
+            val engines = tts?.engines
+            Log.d(TAG, "onInit: 默认TTS引擎=$defaultEngine")
+            Log.d(TAG, "onInit: 所有可用引擎=$engines")
+            
             // 获取可用语言列表
             val availableLanguages = tts?.availableLanguages
             Log.d(TAG, "onInit: 可用语言=$availableLanguages")
             
-            // 尝试设置中文
+            // 检查当前语言设置
+            val currentVoice = tts?.voice
+            Log.d(TAG, "onInit: 当前语音=$currentVoice")
+            
+            // 尝试设置中文 - 华为设备可能需要特殊处理
             var result = tts?.setLanguage(Locale.CHINESE)
             Log.d(TAG, "onInit: 设置 Locale.CHINESE 结果=$result")
             
@@ -85,11 +95,27 @@ class TTSService : Service(), TextToSpeech.OnInitListener {
                     Log.d(TAG, "onInit: 设置 zh_CN 结果=$result")
                     
                     if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
-                        Log.w(TAG, "onInit: 中文不支持，使用英文")
-                        tts?.setLanguage(Locale.ENGLISH)
+                        // 尝试中文（台湾）
+                        result = tts?.setLanguage(Locale("zh", "TW"))
+                        Log.d(TAG, "onInit: 设置 zh_TW 结果=$result")
+                        
+                        if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+                            // 尝试中文（香港）
+                            result = tts?.setLanguage(Locale("zh", "HK"))
+                            Log.d(TAG, "onInit: 设置 zh_HK 结果=$result")
+                            
+                            if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+                                Log.w(TAG, "onInit: 中文不支持，使用英文")
+                                tts?.setLanguage(Locale.ENGLISH)
+                            }
+                        }
                     }
                 }
             }
+            
+            // 再次检查当前语音设置
+            val finalVoice = tts?.voice
+            Log.d(TAG, "onInit: 最终语音设置=$finalVoice")
             
             tts?.setSpeechRate(0.9f)
             tts?.setPitch(1.0f)
@@ -173,10 +199,15 @@ class TTSService : Service(), TextToSpeech.OnInitListener {
         val result = tts?.speak(message, TextToSpeech.QUEUE_FLUSH, params, "zhenci_tts")
         Log.d(TAG, "speak: speak() 返回结果=$result")
         
-        // 如果 speak 返回 ERROR，停止服务
+        // 如果 speak 返回 ERROR，尝试不使用 Bundle 参数再试一次
         if (result == TextToSpeech.ERROR) {
-            Log.e(TAG, "speak: speak() 返回错误")
-            stopSelf()
+            Log.e(TAG, "speak: speak() 返回错误，尝试不使用 Bundle 参数")
+            val retryResult = tts?.speak(message, TextToSpeech.QUEUE_FLUSH, null, "zhenci_tts")
+            Log.d(TAG, "speak: 重试结果=$retryResult")
+            if (retryResult == TextToSpeech.ERROR) {
+                Log.e(TAG, "speak: 重试仍然失败，停止服务")
+                stopSelf()
+            }
         }
     }
 
