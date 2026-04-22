@@ -71,6 +71,22 @@ jobs:
         BUILD_EXIT_CODE=${PIPESTATUS[0]}
         echo "Build exit code: $BUILD_EXIT_CODE"
         exit $BUILD_EXIT_CODE
+
+    - name: Sign APK
+      run: |
+        echo "=== Generating debug keystore ==="
+        keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+        
+        echo "=== Signing APK ==="
+        for apk in app/build/outputs/apk/debug/*.apk; do
+          if [[ "$apk" != *"-signed"* ]]; then
+            echo "Signing: $apk"
+            jarsigner -verbose -sigalg SHA1withRSA -digestalg SHA1 -keystore debug.keystore -storepass android -keypass android "$apk" androiddebugkey
+            
+            # 验证签名
+            jarsigner -verify -verbose -certs "$apk"
+          fi
+        done
         
     - name: Show build results
       run: |
