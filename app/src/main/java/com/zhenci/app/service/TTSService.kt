@@ -33,6 +33,12 @@ class TTSService : Service(), TextToSpeech.OnInitListener {
         super.onCreate()
         Log.d(TAG, "onCreate: TTS 服务创建")
         createNotificationChannel()
+        
+        // 立即启动前台服务（华为系统要求 5 秒内）
+        val notification = createNotification("准备播报...")
+        startForeground(NOTIFICATION_ID, notification)
+        Log.d(TAG, "onCreate: 前台服务已启动")
+        
         tts = TextToSpeech(this, this)
     }
 
@@ -44,10 +50,10 @@ class TTSService : Service(), TextToSpeech.OnInitListener {
         if (message != null) {
             currentMessage = message
             
-            // 启动前台服务，防止被系统杀死
+            // 更新通知内容
             val notification = createNotification(message)
-            startForeground(NOTIFICATION_ID, notification)
-            Log.d(TAG, "onStartCommand: 前台服务已启动")
+            val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.notify(NOTIFICATION_ID, notification)
             
             if (tts?.isSpeaking == true) {
                 tts?.stop()

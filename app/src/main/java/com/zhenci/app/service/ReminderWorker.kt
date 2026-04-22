@@ -50,18 +50,25 @@ class ReminderWorker(
             // 语音播报 - 使用前台服务确保不被杀死
             val message = content.take(50) // 增加到50字
             Log.d(TAG, "doWork: 准备启动 TTS 服务，消息: $message")
-            val ttsIntent = Intent(applicationContext, TTSService::class.java).apply {
-                putExtra("message", message)
-                putExtra("task_id", taskId)
-            }
             
-            // Android O+ 需要使用 startForegroundService
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                applicationContext.startForegroundService(ttsIntent)
-            } else {
-                applicationContext.startService(ttsIntent)
+            try {
+                val ttsIntent = Intent(applicationContext, TTSService::class.java).apply {
+                    putExtra("message", message)
+                    putExtra("task_id", taskId)
+                }
+                
+                // Android O+ 需要使用 startForegroundService
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    applicationContext.startForegroundService(ttsIntent)
+                } else {
+                    applicationContext.startService(ttsIntent)
+                }
+                Log.d(TAG, "doWork: TTS 服务已启动")
+            } catch (e: Exception) {
+                Log.e(TAG, "doWork: 启动 TTS 服务失败: ${e.message}")
+                // 如果服务启动失败，尝试直接播放提示音
+                playAlarmSound(applicationContext)
             }
-            Log.d(TAG, "doWork: TTS 服务已启动")
             
             // 等待语音播报完成
             delay(10000)
