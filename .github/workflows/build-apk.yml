@@ -77,16 +77,27 @@ jobs:
         echo "=== Generating debug keystore ==="
         keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
         
-        echo "=== Signing APK ==="
+        echo "=== Find Android SDK build tools ==="
+        BUILD_TOOLS_VERSION=$(ls $ANDROID_SDK_ROOT/build-tools/ | sort -V | tail -1)
+        echo "Build tools version: $BUILD_TOOLS_VERSION"
+        BUILD_TOOLS_PATH=$ANDROID_SDK_ROOT/build-tools/$BUILD_TOOLS_VERSION
+        echo "Build tools path: $BUILD_TOOLS_PATH"
+        
+        echo "=== Signing APK with apksigner ==="
         for apk in app/build/outputs/apk/debug/*.apk; do
-          if [[ "$apk" != *"-signed"* ]]; then
+          if [[ "$apk" != *"-signed"* ]] && [[ "$apk" == *"debug"* ]]; then
             echo "Signing: $apk"
-            jarsigner -verbose -sigalg SHA1withRSA -digestalg SHA1 -keystore debug.keystore -storepass android -keypass android "$apk" androiddebugkey
+            # 使用 apksigner 进行 v2 签名
+            $BUILD_TOOLS_PATH/apksigner sign --ks debug.keystore --ks-pass pass:android --key-pass pass:android --v1-signing-enabled true --v2-signing-enabled true "$apk"
             
             # 验证签名
-            jarsigner -verify -verbose -certs "$apk"
+            echo "Verifying signature..."
+            $BUILD_TOOLS_PATH/apksigner verify -v "$apk"
           fi
         done
+        
+        echo "=== APK files after signing ==="
+        ls -la app/build/outputs/apk/debug/
         
     - name: Show build results
       run: |
