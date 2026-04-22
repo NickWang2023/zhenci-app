@@ -5,16 +5,20 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
+import android.media.AudioManager
 import android.media.MediaPlayer
 import android.net.Uri
 import android.os.PowerManager
+import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import android.util.Log
 import com.zhenci.app.MainActivity
 import com.zhenci.app.ZhenciApplication
 import kotlinx.coroutines.delay
+import java.util.*
 
 class ReminderWorker(
     context: Context,
@@ -47,31 +51,15 @@ class ReminderWorker(
             // 播放提示音
             playAlarmSound(applicationContext)
             
-            // 语音播报 - 使用前台服务确保不被杀死
+            // 语音播报 - 直接使用 TTS
             val message = content.take(50) // 增加到50字
-            Log.d(TAG, "doWork: 准备启动 TTS 服务，消息: $message")
+            Log.d(TAG, "doWork: 准备语音播报，消息: $message")
             
-            try {
-                val ttsIntent = Intent(applicationContext, TTSService::class.java).apply {
-                    putExtra("message", message)
-                    putExtra("task_id", taskId)
-                }
-                
-                // Android O+ 需要使用 startForegroundService
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                    applicationContext.startForegroundService(ttsIntent)
-                } else {
-                    applicationContext.startService(ttsIntent)
-                }
-                Log.d(TAG, "doWork: TTS 服务已启动")
-            } catch (e: Exception) {
-                Log.e(TAG, "doWork: 启动 TTS 服务失败: ${e.message}")
-                // 如果服务启动失败，尝试直接播放提示音
-                playAlarmSound(applicationContext)
-            }
+            // 使用 TTS 直接播报
+            speakWithTTS(applicationContext, message)
             
             // 等待语音播报完成
-            delay(10000)
+            delay(8000)
             
             // 重新设置明天的闹钟（用于每日重复任务）
             rescheduleForTomorrow(taskId, content)
@@ -86,11 +74,14 @@ class ReminderWorker(
     }
 
     private fun showNotification(context: Context, title: String, description: String) {
+        val taskId = inputData.getLong("task_id", 0)
+        val notificationId = taskId.toInt()
+        
         val intent = Intent(context, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
         }
         val pendingIntent = PendingIntent.getActivity(
-            context, 0, intent,
+            context, notificationId, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
@@ -103,11 +94,11 @@ class ReminderWorker(
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
             .setVibrate(longArrayOf(0, 1000, 500, 1000))
-            .setOngoing(true) // 设置为正在进行，防止被系统清除
+            .setOngoing(false) // 不设置为正在进行，允许用户清除
             .build()
 
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        notificationManager.notify(System.currentTimeMillis().toInt(), notification)
+        notificationManager.notify(notificationId, notification)
     }
 
     private fun playAlarmSound(context: Context) {
@@ -129,6 +120,59 @@ class ReminderWorker(
             }, 3000)
         } catch (e: Exception) {
             e.printStackTrace()
+        }
+    }
+
+    private fun speakWithTTS(context: Context, message: String) {
+        try {
+            Log.d(TAG, "speakWithTTS: 初始化 TTS")
+            var tts: TextToSpeech? = null
+            tts = TextToSpeech(context) { status ->
+                if (status == TextToSpeech.SUCCESS) {
+                    Log.d(TAG, "speakWithTTS: TTS 初始化成功")
+                    
+                    // 设置中文
+                    val result = tts?.setLanguage(Locale.CHINESE)
+                    if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+                        tts?.setLanguage(Locale.SIMPLIFIED_CHINESE)
+                    }
+                    
+                    // 设置音频属性
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                        val audioAttributes = AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_MEDIA)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                            .build()
+                        tts?.setAudioAttributes(audioAttributes)
+                    }
+                    
+                    // 设置监听
+                    tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                        override fun onStart(utteranceId: String?) {
+                            Log.d(TAG, "speakWithTTS: 开始播报")
+                        }
+                        override fun onDone(utteranceId: String?) {
+                            Log.d(TAG, "speakWithTTS: 播报完成")
+                            tts?.shutdown()
+                        }
+                        override fun onError(utteranceId: String?) {
+                            Log.e(TAG, "speakWithTTS: 播报错误")
+                            tts?.shutdown()
+                        }
+                    })
+                    
+                    // 播报
+                    val params = Bundle()
+                    params.putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, "zhenci")
+                    val speakResult = tts?.speak(message, TextToSpeech.QUEUE_FLUSH, params, "zhenci")
+                    Log.d(TAG, "speakWithTTS: speak() 结果=$speakResult")
+                } else {
+                    Log.e(TAG, "speakWithTTS: TTS 初始化失败")
+                    tts?.shutdown()
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "speakWithTTS: 异常: ${e.message}")
         }
     }
 

@@ -57,46 +57,6 @@ class AlarmScheduler(private val context: Context) {
             workRequest
         )
         Log.d(TAG, "scheduleTask: WorkManager 任务已设置，延迟 ${delayMillis}ms")
-
-        // 同时设置 AlarmManager 作为备份（确保精确时间）
-        val intent = Intent(context, AlarmReceiver::class.java).apply {
-            putExtra("task_id", task.id)
-            putExtra("task_content", task.content)
-        }
-
-        val pendingIntent = PendingIntent.getBroadcast(
-            context,
-            task.id.toInt(),
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (alarmManager.canScheduleExactAlarms()) {
-                Log.d(TAG, "scheduleTask: 使用 setExactAndAllowWhileIdle")
-                alarmManager.setExactAndAllowWhileIdle(
-                    AlarmManager.RTC_WAKEUP,
-                    calendar.timeInMillis,
-                    pendingIntent
-                )
-            } else {
-                // 没有精确闹钟权限时，使用 setAndAllowWhileIdle
-                Log.w(TAG, "scheduleTask: 没有精确闹钟权限，使用 setAndAllowWhileIdle")
-                alarmManager.setAndAllowWhileIdle(
-                    AlarmManager.RTC_WAKEUP,
-                    calendar.timeInMillis,
-                    pendingIntent
-                )
-            }
-        } else {
-            Log.d(TAG, "scheduleTask: Android < 12，使用 setExactAndAllowWhileIdle")
-            alarmManager.setExactAndAllowWhileIdle(
-                AlarmManager.RTC_WAKEUP,
-                calendar.timeInMillis,
-                pendingIntent
-            )
-        }
-        Log.d(TAG, "scheduleTask: AlarmManager 闹钟已设置，时间戳 ${calendar.timeInMillis}")
     }
 
     fun cancelTask(taskId: Long) {
