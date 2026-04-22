@@ -127,7 +127,7 @@ class TTSService : Service(), TextToSpeech.OnInitListener {
             tts?.setPitch(1.0f)
             
             // 设置音频流类型为媒体，确保有声音（华为系统对 ALARM 流有限制）
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            if (Build.VERSION.SDK_INT >= 21) {
                 val audioAttributes = AudioAttributes.Builder()
                     .setUsage(AudioAttributes.USAGE_MEDIA)
                     .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
