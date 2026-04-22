@@ -65,68 +65,26 @@ jobs:
         
         echo "=== Gradle Wrapper Setup Complete ==="
         
+    - name: Generate Debug Keystore
+      run: |
+        echo "=== Creating debug keystore directory ==="
+        mkdir -p ~/.android
+        
+        echo "=== Generating debug keystore ==="
+        keytool -genkey -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+        echo "Keystore generated at ~/.android/debug.keystore"
+        ls -la ~/.android/debug.keystore
+
     - name: Build Debug APK
       run: |
         ./gradlew :app:assembleDebug --no-daemon --stacktrace 2>&1 | tee build.log
         BUILD_EXIT_CODE=${PIPESTATUS[0]}
         echo "Build exit code: $BUILD_EXIT_CODE"
         exit $BUILD_EXIT_CODE
-
-    - name: Sign APK
+        
+    - name: Verify APK Signature
       run: |
-        echo "=== Generating debug keystore ==="
-        keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
-        echo "Keystore generated successfully"
-        
-        echo "=== Environment variables ==="
-        echo "ANDROID_SDK_ROOT: $ANDROID_SDK_ROOT"
-        echo "ANDROID_HOME: $ANDROID_HOME"
-        
-        echo "=== Find Android SDK build tools ==="
-        if [ -d "$ANDROID_SDK_ROOT/build-tools" ]; then
-          BUILD_TOOLS_VERSION=$(ls $ANDROID_SDK_ROOT/build-tools/ | sort -V | tail -1)
-          echo "Build tools version: $BUILD_TOOLS_VERSION"
-          BUILD_TOOLS_PATH=$ANDROID_SDK_ROOT/build-tools/$BUILD_TOOLS_VERSION
-          echo "Build tools path: $BUILD_TOOLS_PATH"
-          
-          if [ -f "$BUILD_TOOLS_PATH/apksigner" ]; then
-            echo "apksigner found"
-          else
-            echo "apksigner not found, trying to find it..."
-            find $ANDROID_SDK_ROOT -name "apksigner" -type f 2>/dev/null | head -5
-          fi
-        else
-          echo "build-tools directory not found"
-          ls -la $ANDROID_SDK_ROOT/ 2>/dev/null || echo "Cannot list SDK root"
-        fi
-        
-        echo "=== APK files before signing ==="
-        ls -la app/build/outputs/apk/debug/
-        
-        echo "=== Signing APK with apksigner ==="
-        for apk in app/build/outputs/apk/debug/*.apk; do
-          echo "Processing: $apk"
-          if [[ "$apk" != *"-signed"* ]] && [[ "$apk" == *"debug"* ]]; then
-            echo "Signing: $apk"
-            # 使用 apksigner 进行 v2 签名
-            if [ -f "$BUILD_TOOLS_PATH/apksigner" ]; then
-              $BUILD_TOOLS_PATH/apksigner sign --ks debug.keystore --ks-pass pass:android --key-pass pass:android --v1-signing-enabled true --v2-signing-enabled true "$apk"
-              SIGN_RESULT=$?
-              echo "Sign result: $SIGN_RESULT"
-              
-              # 验证签名
-              echo "Verifying signature..."
-              $BUILD_TOOLS_PATH/apksigner verify -v "$apk"
-            else
-              echo "apksigner not available, using jarsigner fallback"
-              jarsigner -verbose -sigalg SHA1withRSA -digestalg SHA1 -keystore debug.keystore -storepass android -keypass android "$apk" androiddebugkey
-            fi
-          else
-            echo "Skipping: $apk"
-          fi
-        done
-        
-        echo "=== APK files after signing ==="
+        echo "=== APK files ==="
         ls -la app/build/outputs/apk/debug/
         
         echo "=== Checking APK signature ==="
