@@ -9,7 +9,7 @@ android {
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.zhenci.app"
+        applicationId = "com.zhenci.app.v2"
         minSdk = 24
         targetSdk = 34
         versionCode = 1
