@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.zhenci.app.data.entity.Task
 import com.zhenci.app.data.entity.TaskType
 import com.zhenci.app.ui.theme.LifeTaskColor
@@ -24,28 +25,21 @@ import com.zhenci.app.ui.theme.OtherTaskColor
 import com.zhenci.app.ui.theme.WorkTaskColor
 import com.zhenci.app.ui.components.ReminderDialog
 import com.zhenci.app.service.AlarmScheduler
+import com.zhenci.app.viewmodel.TaskViewModel
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
-import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TodayScreen() {
+fun TodayScreen(
+    viewModel: TaskViewModel = viewModel(factory = TaskViewModel.Factory)
+) {
     val context = LocalContext.current
     
-    // 任务列表状态（实际应用应从数据库读取）
-    var tasks by remember {
-        mutableStateOf(
-            mutableListOf(
-                Task(1, "晨间阅读", 7, 0, TaskType.WORK, true, false),
-                Task(2, "吃早饭", 8, 0, TaskType.LIFE, true, false),
-                Task(3, "开始工作", 9, 0, TaskType.WORK, true, false),
-                Task(4, "吃午饭", 12, 0, TaskType.LIFE, true, false),
-                Task(5, "运动健身", 18, 0, TaskType.LIFE, true, false),
-                Task(6, "复盘总结", 21, 0, TaskType.WORK, true, false)
-            )
-        )
-    }
+    // 从 ViewModel 获取数据
+    val tasks by viewModel.tasks.collectAsState()
+    val todayScore by viewModel.todayScore.collectAsState()
+    val totalScore by viewModel.totalScore.collectAsState()
     
     // 对话框状态
     var showAddDialog by remember { mutableStateOf(false) }
@@ -58,10 +52,6 @@ fun TodayScreen() {
     var showReminderDialog by remember { mutableStateOf(false) }
     var reminderTask by remember { mutableStateOf<Task?>(null) }
     
-    // 积分状态（实际应从数据库读取）
-    var totalScore by remember { mutableStateOf(0) }
-    var todayScore by remember { mutableStateOf(0) }
-    
     // 闹钟调度器
     val alarmScheduler = remember { AlarmScheduler(context) }
     
@@ -69,14 +59,29 @@ fun TodayScreen() {
     val completedCount = tasks.count { it.isCompleted }
     val completionRate = if (tasks.isNotEmpty()) (completedCount * 100 / tasks.size) else 0
     
-    // 模拟：检查是否有任务到达提醒时间（实际应由AlarmManager触发）
-    LaunchedEffect(Unit) {
-        // 这里模拟弹窗，实际应由AlarmReceiver触发
-        // 为了演示，延迟3秒显示一个模拟弹窗
-        kotlinx.coroutines.delay(3000)
-        if (tasks.isNotEmpty()) {
-            reminderTask = tasks.first()
-            showReminderDialog = true
+    // 检查是否有未完成的任务需要提醒
+    LaunchedEffect(tasks) {
+        val incompleteTasks = tasks.filter { !it.isCompleted && it.isEnabled }
+        if (incompleteTasks.isNotEmpty()) {
+            // 找到最接近当前时间的任务
+            val now = LocalTime.now()
+            val currentMinutes = now.hour * 60 + now.minute
+            
+            val upcomingTask = incompleteTasks.minByOrNull { task ->
+                val taskMinutes = task.hour * 60 + task.minute
+                val diff = taskMinutes - currentMinutes
+                if (diff >= 0) diff else Int.MAX_VALUE // 只找未来的任务
+            }
+            
+            // 如果任务时间在当前时间前后5分钟内，显示提醒
+            upcomingTask?.let { task ->
+                val taskMinutes = task.hour * 60 + task.minute
+                val diff = kotlin.math.abs(taskMinutes - currentMinutes)
+                if (diff <= 5 && !showReminderDialog) {
+                    reminderTask = task
+                    showReminderDialog = true
+                }
+            }
         }
     }
 
@@ -87,7 +92,7 @@ fun TodayScreen() {
                     Column {
                         Text("今日日程")
                         Text(
-                            text = "完成 $completedCount/${tasks.size} | 积分 $todayScore",
+                            text = "完成 $completedCount/${tasks.size} | 今日积分 $todayScore | 总积分 $totalScore",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f)
                         )
@@ -129,18 +134,15 @@ fun TodayScreen() {
                         TaskCard(
                             task = task,
                             onToggleComplete = {
-                                tasks = tasks.map { 
-                                    if (it.id == task.id) it.copy(isCompleted = !it.isCompleted) else it 
-                                }.toMutableList()
+                                viewModel.toggleTaskCompletion(task.id, !task.isCompleted)
                             },
                             onToggleEnable = {
                                 val newEnabledState = !task.isEnabled
-                                tasks = tasks.map { 
-                                    if (it.id == task.id) it.copy(isEnabled = newEnabledState) else it 
-                                }.toMutableList()
+                                val updatedTask = task.copy(isEnabled = newEnabledState)
+                                viewModel.updateTask(updatedTask)
                                 // 更新闹钟状态
                                 if (newEnabledState) {
-                                    alarmScheduler.scheduleTask(task.copy(isEnabled = true))
+                                    alarmScheduler.scheduleTask(updatedTask)
                                 } else {
                                     alarmScheduler.cancelTask(task.id)
                                 }
@@ -167,12 +169,10 @@ fun TodayScreen() {
             task = null,
             onDismiss = { showAddDialog = false },
             onConfirm = { newTask ->
-                val newId = (tasks.maxOfOrNull { it.id } ?: 0) + 1
-                val taskWithId = newTask.copy(id = newId)
-                tasks.add(taskWithId)
+                viewModel.addTask(newTask)
                 // 如果启用了提醒，设置闹钟
-                if (taskWithId.isEnabled) {
-                    alarmScheduler.scheduleTask(taskWithId)
+                if (newTask.isEnabled) {
+                    alarmScheduler.scheduleTask(newTask)
                 }
                 showAddDialog = false
             }
@@ -189,9 +189,7 @@ fun TodayScreen() {
                 editingTask = null
             },
             onConfirm = { updatedTask ->
-                tasks = tasks.map { 
-                    if (it.id == updatedTask.id) updatedTask else it 
-                }.toMutableList()
+                viewModel.updateTask(updatedTask)
                 // 重新设置闹钟
                 alarmScheduler.cancelTask(updatedTask.id)
                 if (updatedTask.isEnabled) {
@@ -217,7 +215,7 @@ fun TodayScreen() {
                     onClick = {
                         deletingTask?.let { task ->
                             alarmScheduler.cancelTask(task.id)
-                            tasks.removeAll { it.id == task.id }
+                            viewModel.deleteTask(task)
                         }
                         showDeleteConfirm = false
                         deletingTask = null
@@ -247,16 +245,13 @@ fun TodayScreen() {
             taskTime = String.format("%02d:%02d", reminderTask!!.hour, reminderTask!!.minute),
             onExecute = {
                 // 执行：+1分，标记完成
-                totalScore += 1
-                todayScore += 1
-                tasks = tasks.map { 
-                    if (it.id == reminderTask!!.id) it.copy(isCompleted = true) else it 
-                }.toMutableList()
+                viewModel.executeTask(reminderTask!!.id)
                 showReminderDialog = false
                 reminderTask = null
             },
             onClose = {
                 // 关闭：不加分，仅关闭弹窗
+                viewModel.closeTask(reminderTask!!.id)
                 showReminderDialog = false
                 reminderTask = null
             }
