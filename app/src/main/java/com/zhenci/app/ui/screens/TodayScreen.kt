@@ -26,13 +26,22 @@ import com.zhenci.app.ui.theme.WorkTaskColor
 import com.zhenci.app.ui.components.ReminderDialog
 import com.zhenci.app.service.AlarmScheduler
 import com.zhenci.app.viewmodel.TaskViewModel
+import androidx.lifecycle.ViewModelProvider
+import android.app.Application
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TodayScreen(
-    viewModel: TaskViewModel = viewModel(factory = TaskViewModel.Factory)
+    viewModel: TaskViewModel = viewModel(
+        factory = object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
+                return TaskViewModel(Application()) as T
+            }
+        }
+    )
 ) {
     val context = LocalContext.current
     
