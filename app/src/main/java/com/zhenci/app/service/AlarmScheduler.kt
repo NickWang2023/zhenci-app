@@ -25,6 +25,20 @@ class AlarmScheduler(private val context: Context) {
 
     fun scheduleTask(task: Task) {
         Log.d(TAG, "scheduleTask: 开始设置任务 ${task.id} - ${task.content} at ${task.hour}:${task.minute}")
+        
+        // 使用 AlarmManager 确保精确唤醒（黑屏也能提醒）
+        val intent = Intent(context, AlarmReceiver::class.java).apply {
+            putExtra("task_id", task.id)
+            putExtra("task_content", task.content)
+        }
+
+        val pendingIntent = PendingIntent.getBroadcast(
+            context,
+            task.id.toInt(),
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         val calendar = Calendar.getInstance().apply {
             set(Calendar.HOUR_OF_DAY, task.hour)
             set(Calendar.MINUTE, task.minute)
@@ -36,27 +50,36 @@ class AlarmScheduler(private val context: Context) {
             }
         }
 
-        val delayMillis = calendar.timeInMillis - System.currentTimeMillis()
-
-        // 创建 WorkRequest 数据
-        val inputData = Data.Builder()
-            .putLong("task_id", task.id)
-            .putString("task_content", task.content)
-            .build()
-
-        // 使用 WorkManager 调度任务
-        val workRequest = OneTimeWorkRequestBuilder<ReminderWorker>()
-            .setInitialDelay(delayMillis, TimeUnit.MILLISECONDS)
-            .setInputData(inputData)
-            .addTag("task_${task.id}")
-            .build()
-
-        workManager.enqueueUniqueWork(
-            "task_${task.id}",
-            ExistingWorkPolicy.REPLACE,
-            workRequest
-        )
-        Log.d(TAG, "scheduleTask: WorkManager 任务已设置，延迟 ${delayMillis}ms")
+        // 使用 setExactAndAllowWhileIdle 确保在 Doze 模式下也能唤醒
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (alarmManager.canScheduleExactAlarms()) {
+                alarmManager.setExactAndAllowWhileIdle(
+                    AlarmManager.RTC_WAKEUP,
+                    calendar.timeInMillis,
+                    pendingIntent
+                )
+            } else {
+                alarmManager.setAndAllowWhileIdle(
+                    AlarmManager.RTC_WAKEUP,
+                    calendar.timeInMillis,
+                    pendingIntent
+                )
+            }
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            alarmManager.setExactAndAllowWhileIdle(
+                AlarmManager.RTC_WAKEUP,
+                calendar.timeInMillis,
+                pendingIntent
+            )
+        } else {
+            alarmManager.setExact(
+                AlarmManager.RTC_WAKEUP,
+                calendar.timeInMillis,
+                pendingIntent
+            )
+        }
+        
+        Log.d(TAG, "scheduleTask: AlarmManager 任务已设置，时间 ${calendar.time}")
     }
 
     fun cancelTask(taskId: Long) {
