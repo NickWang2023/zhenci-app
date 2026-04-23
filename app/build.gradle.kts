@@ -21,18 +21,9 @@ android {
         }
     }
 
-    signingConfigs {
-        create("config") {
-            storeFile = file(System.getenv("HOME") + "/.android/debug.keystore")
-            storePassword = "android"
-            keyAlias = "androiddebugkey"
-            keyPassword = "android"
-        }
-    }
-
     buildTypes {
         debug {
-            signingConfig = signingConfigs.getByName("config")
+            isDebuggable = true
         }
         release {
             isMinifyEnabled = false

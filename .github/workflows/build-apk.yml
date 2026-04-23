@@ -34,31 +34,6 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-gradle-
 
-    - name: Generate Debug Keystore
-      run: |
-        echo "=== Creating debug keystore directory ==="
-        mkdir -p $HOME/.android
-        
-        echo "=== Generating debug keystore ==="
-        keytool -genkey -v \
-          -keystore $HOME/.android/debug.keystore \
-          -storepass android \
-          -alias androiddebugkey \
-          -keypass android \
-          -keyalg RSA \
-          -keysize 2048 \
-          -validity 10000 \
-          -dname "CN=Android Debug,O=Android,C=US"
-        
-        echo "Keystore generated at $HOME/.android/debug.keystore"
-        ls -la $HOME/.android/debug.keystore
-        
-        echo "=== Verifying keystore ==="
-        keytool -list -v -keystore $HOME/.android/debug.keystore -storepass android -alias androiddebugkey
-        
-        echo "=== Setting environment variable ==="
-        echo "ANDROID_HOME=$HOME/.android" >> $GITHUB_ENV
-        
     - name: Setup Gradle Wrapper
       run: |
         echo "=== Setting up Gradle Wrapper ==="
