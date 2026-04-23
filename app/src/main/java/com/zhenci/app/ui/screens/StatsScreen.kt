@@ -10,22 +10,40 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.zhenci.app.viewmodel.TaskViewModel
+import android.app.Application
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun StatsScreen(
-    totalScore: Int = 0,
-    todayScore: Int = 0,
-    totalExecuted: Int = 0,
-    todayExecuted: Int = 0,
-    currentStreak: Int = 0,
-    maxStreak: Int = 0
-) {
+fun StatsScreen() {
+    val context = LocalContext.current
+    val viewModel: TaskViewModel = viewModel(
+        factory = object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
+                return TaskViewModel(context.applicationContext as Application) as T
+            }
+        }
+    )
+    
+    val userStats by viewModel.userStats.collectAsState()
+    
+    val totalScore = userStats.totalScore
+    val todayScore = userStats.todayScore
+    val totalExecuted = userStats.totalExecuted
+    val todayExecuted = userStats.todayExecuted
+    val currentStreak = userStats.currentStreak
+    val maxStreak = userStats.maxStreak
     Scaffold(
         topBar = {
             TopAppBar(
