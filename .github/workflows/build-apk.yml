@@ -34,6 +34,17 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-gradle-
 
+    - name: Verify Icon Files
+      run: |
+        echo "=== Verifying icon files ==="
+        ls -la app/src/main/res/mipmap-*/ic_launcher.png
+        echo "=== Checking icon file headers ==="
+        for f in app/src/main/res/mipmap-*/ic_launcher.png; do
+          echo "File: $f"
+          file "$f" | head -1
+          head -c 100 "$f" | xxd | head -3
+        done
+        
     - name: Setup Gradle Wrapper
       run: |
         echo "=== Setting up Gradle Wrapper ==="
