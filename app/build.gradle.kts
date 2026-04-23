@@ -22,7 +22,7 @@ android {
     }
 
     signingConfigs {
-        getByName("debug") {
+        create("release") {
             storeFile = file(System.getenv("HOME") + "/.android/debug.keystore")
             storePassword = "android"
             keyAlias = "androiddebugkey"
@@ -32,7 +32,7 @@ android {
 
     buildTypes {
         debug {
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
         }
         release {
             isMinifyEnabled = false

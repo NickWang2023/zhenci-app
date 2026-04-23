@@ -34,6 +34,19 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-gradle-
 
+    - name: Generate Debug Keystore
+      run: |
+        echo "=== Creating debug keystore directory ==="
+        mkdir -p ~/.android
+        
+        echo "=== Generating debug keystore ==="
+        keytool -genkey -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+        echo "Keystore generated at ~/.android/debug.keystore"
+        ls -la ~/.android/debug.keystore
+        
+        echo "=== Verifying keystore ==="
+        keytool -list -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey
+        
     - name: Setup Gradle Wrapper
       run: |
         echo "=== Setting up Gradle Wrapper ==="
@@ -64,16 +77,6 @@ jobs:
         chmod +x gradlew
         
         echo "=== Gradle Wrapper Setup Complete ==="
-        
-    - name: Generate Debug Keystore
-      run: |
-        echo "=== Creating debug keystore directory ==="
-        mkdir -p ~/.android
-        
-        echo "=== Generating debug keystore ==="
-        keytool -genkey -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
-        echo "Keystore generated at ~/.android/debug.keystore"
-        ls -la ~/.android/debug.keystore
 
     - name: Build Debug APK
       run: |
