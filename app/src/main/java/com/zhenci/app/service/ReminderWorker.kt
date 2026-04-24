@@ -82,6 +82,10 @@ class ReminderWorker(
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        // 设置通知声音为默认闹钟声音
+        val defaultSoundUri = android.provider.Settings.System.DEFAULT_ALARM_ALERT_URI
+            ?: android.provider.Settings.System.DEFAULT_NOTIFICATION_URI
+
         val notification = NotificationCompat.Builder(context, ZhenciApplication.CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle(title)
@@ -91,7 +95,10 @@ class ReminderWorker(
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
             .setVibrate(longArrayOf(0, 1000, 500, 1000))
-            .setOngoing(false) // 不设置为正在进行，允许用户清除
+            .setSound(defaultSoundUri, android.media.AudioManager.STREAM_ALARM) // 使用闹钟音量
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC) // 锁屏显示
+            .setFullScreenIntent(pendingIntent, true) // 强制全屏显示（黑屏时唤醒）
+            .setOngoing(false)
             .build()
 
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -176,6 +183,14 @@ class ReminderWorker(
     private suspend fun speakWithTTSSuspend(context: Context, message: String) {
         try {
             Log.d(TAG, "speakWithTTSSuspend: 初始化 TTS")
+            
+            // 设置闹钟音量最大
+            val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
+            val originalVolume = audioManager.getStreamVolume(android.media.AudioManager.STREAM_ALARM)
+            val maxVolume = audioManager.getStreamMaxVolume(android.media.AudioManager.STREAM_ALARM)
+            audioManager.setStreamVolume(android.media.AudioManager.STREAM_ALARM, maxVolume, 0)
+            Log.d(TAG, "speakWithTTSSuspend: 设置闹钟音量 $originalVolume -> $maxVolume")
+            
             val ttsInitDeferred = kotlinx.coroutines.CompletableDeferred<Boolean>()
             val ttsDoneDeferred = kotlinx.coroutines.CompletableDeferred<Unit>()
             var tts: TextToSpeech? = null
@@ -190,11 +205,15 @@ class ReminderWorker(
                         tts?.setLanguage(Locale.SIMPLIFIED_CHINESE)
                     }
                     
+                    // 设置音量为最大
+                    tts?.setSpeechRate(0.9f) // 稍微慢一点，更清晰
+                    
                     // 设置音频属性 (Android 5.0+) - 使用 ALARM 类型确保黑屏时也能播放
                     if (Build.VERSION.SDK_INT >= 21) {
                         val audioAttributes = AudioAttributes.Builder()
                             .setUsage(AudioAttributes.USAGE_ALARM)
                             .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                            .setFlags(AudioAttributes.FLAG_AUDIBILITY_ENFORCED) // 强制可听
                             .build()
                         tts?.setAudioAttributes(audioAttributes)
                     }
@@ -206,11 +225,15 @@ class ReminderWorker(
                         }
                         override fun onDone(utteranceId: String?) {
                             Log.d(TAG, "speakWithTTSSuspend: 播报完成")
+                            // 恢复原始音量
+                            audioManager.setStreamVolume(android.media.AudioManager.STREAM_ALARM, originalVolume, 0)
                             tts?.shutdown()
                             ttsDoneDeferred.complete(Unit)
                         }
                         override fun onError(utteranceId: String?) {
                             Log.e(TAG, "speakWithTTSSuspend: 播报错误")
+                            // 恢复原始音量
+                            audioManager.setStreamVolume(android.media.AudioManager.STREAM_ALARM, originalVolume, 0)
                             tts?.shutdown()
                             ttsDoneDeferred.complete(Unit)
                         }
@@ -219,6 +242,7 @@ class ReminderWorker(
                     ttsInitDeferred.complete(true)
                 } else {
                     Log.e(TAG, "speakWithTTSSuspend: TTS 初始化失败")
+                    audioManager.setStreamVolume(android.media.AudioManager.STREAM_ALARM, originalVolume, 0)
                     tts?.shutdown()
                     ttsInitDeferred.complete(false)
                     ttsDoneDeferred.complete(Unit)
@@ -228,15 +252,16 @@ class ReminderWorker(
             // 等待 TTS 初始化完成
             val initSuccess = ttsInitDeferred.await()
             if (initSuccess) {
-                // 播报
+                // 播报 - 使用 QUEUE_FLUSH 确保立即播放
                 val params = Bundle()
                 params.putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, "zhenci")
                 params.putInt(TextToSpeech.Engine.KEY_PARAM_STREAM, android.media.AudioManager.STREAM_ALARM)
+                params.putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1.0f) // 最大音量
                 val speakResult = tts?.speak(message, TextToSpeech.QUEUE_FLUSH, params, "zhenci")
                 Log.d(TAG, "speakWithTTSSuspend: speak() 结果=$speakResult")
                 
-                // 等待播报完成（最多等10秒）
-                kotlinx.coroutines.withTimeoutOrNull(10000) {
+                // 等待播报完成（最多等15秒）
+                kotlinx.coroutines.withTimeoutOrNull(15000) {
                     ttsDoneDeferred.await()
                 }
             }
