@@ -22,8 +22,17 @@ interface TemplateDao {
     suspend fun deleteTemplate(template: Template)
 
     @Query("UPDATE templates SET isDefault = 0")
-    suspend fun clearDefault()
+    suspend fun clearDefaultTemplates()
+
+    @Query("UPDATE templates SET isDefault = 1 WHERE id = :templateId")
+    suspend fun setDefaultTemplate(templateId: Long)
 
     @Query("SELECT * FROM templates WHERE id = :id")
     suspend fun getTemplateById(id: Long): Template?
+
+    @Query("UPDATE templates SET tasksJson = :tasksJson WHERE id = :templateId")
+    suspend fun updateTemplateTasks(templateId: Long, tasksJson: String)
+
+    @Query("SELECT * FROM templates WHERE id = :templateId")
+    suspend fun getTemplateWithTasks(templateId: Long): Template?
 }

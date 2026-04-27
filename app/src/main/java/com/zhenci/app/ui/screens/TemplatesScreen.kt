@@ -10,27 +10,45 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FileUpload
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.zhenci.app.data.entity.Template
+import com.zhenci.app.viewmodel.TemplateViewModel
+import android.app.Application
+import android.widget.Toast
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TemplatesScreen() {
+    val context = LocalContext.current
+    val clipboardManager = LocalClipboardManager.current
+    
+    val viewModel: TemplateViewModel = viewModel(
+        factory = object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
+                return TemplateViewModel(context.applicationContext as Application) as T
+            }
+        }
+    )
+    
+    val templates by viewModel.templates.collectAsState()
+    
     var showCreateDialog by remember { mutableStateOf(false) }
     var showImportDialog by remember { mutableStateOf(false) }
-    
-    // 模拟模板数据
-    val templates = remember {
-        listOf(
-            Template(1, "工作日模板", "标准工作日安排", System.currentTimeMillis(), true),
-            Template(2, "周末模板", "周末休闲安排", System.currentTimeMillis() - 86400000, false),
-            Template(3, "学习日模板", "专注学习安排", System.currentTimeMillis() - 172800000, false)
-        )
-    }
+    var showEditDialog by remember { mutableStateOf(false) }
+    var editingTemplate by remember { mutableStateOf<Template?>(null) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+    var deletingTemplate by remember { mutableStateOf<Template?>(null) }
 
     Scaffold(
         topBar = {
@@ -58,22 +76,67 @@ fun TemplatesScreen() {
             }
         }
     ) { padding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            items(templates) { template ->
-                TemplateCard(
-                    template = template,
-                    onEdit = { },
-                    onDuplicate = { },
-                    onDelete = { },
-                    onExport = { },
-                    onApply = { }
-                )
+        if (templates.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "暂无模板",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "点击右下角创建按钮添加模板",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    )
+                }
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(templates, key = { it.id }) { template ->
+                    TemplateCard(
+                        template = template,
+                        onEdit = { 
+                            editingTemplate = template
+                            showEditDialog = true
+                        },
+                        onDuplicate = { 
+                            viewModel.duplicateTemplate(template)
+                            Toast.makeText(context, "已复制模板", Toast.LENGTH_SHORT).show()
+                        },
+                        onDelete = { 
+                            deletingTemplate = template
+                            showDeleteConfirm = true
+                        },
+                        onExport = { 
+                            val json = viewModel.exportTemplate(template)
+                            clipboardManager.setText(AnnotatedString(json))
+                            Toast.makeText(context, "模板已复制到剪贴板", Toast.LENGTH_SHORT).show()
+                        },
+                        onApply = { 
+                            viewModel.applyTemplate(template) {
+                                Toast.makeText(context, "模板已应用到今日任务", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        onSetDefault = {
+                            viewModel.setDefaultTemplate(template.id)
+                            Toast.makeText(context, "已设为默认模板", Toast.LENGTH_SHORT).show()
+                        }
+                    )
+                }
             }
         }
     }
@@ -81,14 +144,85 @@ fun TemplatesScreen() {
     if (showCreateDialog) {
         CreateTemplateDialog(
             onDismiss = { showCreateDialog = false },
-            onConfirm = { showCreateDialog = false }
+            onConfirm = { name, description ->
+                viewModel.addTemplate(name, description)
+                showCreateDialog = false
+                Toast.makeText(context, "模板创建成功", Toast.LENGTH_SHORT).show()
+            }
+        )
+    }
+
+    if (showEditDialog && editingTemplate != null) {
+        EditTemplateDialog(
+            template = editingTemplate!!,
+            onDismiss = { 
+                showEditDialog = false
+                editingTemplate = null
+            },
+            onConfirm = { name, description ->
+                val updatedTemplate = editingTemplate!!.copy(
+                    name = name,
+                    description = description
+                )
+                viewModel.updateTemplate(updatedTemplate)
+                showEditDialog = false
+                editingTemplate = null
+                Toast.makeText(context, "模板更新成功", Toast.LENGTH_SHORT).show()
+            }
+        )
+    }
+
+    if (showDeleteConfirm && deletingTemplate != null) {
+        AlertDialog(
+            onDismissRequest = { 
+                showDeleteConfirm = false
+                deletingTemplate = null
+            },
+            title = { Text("确认删除") },
+            text = { Text("确定要删除模板「${deletingTemplate?.name}」吗？") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        deletingTemplate?.let {
+                            viewModel.deleteTemplate(it)
+                            Toast.makeText(context, "模板已删除", Toast.LENGTH_SHORT).show()
+                        }
+                        showDeleteConfirm = false
+                        deletingTemplate = null
+                    },
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("删除")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { 
+                    showDeleteConfirm = false
+                    deletingTemplate = null
+                }) {
+                    Text("取消")
+                }
+            }
         )
     }
 
     if (showImportDialog) {
         ImportTemplateDialog(
             onDismiss = { showImportDialog = false },
-            onConfirm = { showImportDialog = false }
+            onConfirm = { json ->
+                viewModel.importTemplate(
+                    json = json,
+                    onSuccess = {
+                        showImportDialog = false
+                        Toast.makeText(context, "模板导入成功", Toast.LENGTH_SHORT).show()
+                    },
+                    onError = { error ->
+                        Toast.makeText(context, "导入失败: $error", Toast.LENGTH_LONG).show()
+                    }
+                )
+            }
         )
     }
 }
@@ -101,7 +235,8 @@ fun TemplateCard(
     onDuplicate: () -> Unit,
     onDelete: () -> Unit,
     onExport: () -> Unit,
-    onApply: () -> Unit
+    onApply: () -> Unit,
+    onSetDefault: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -148,7 +283,7 @@ fun TemplateCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                OutlinedButton(
+                Button(
                     onClick = onApply,
                     modifier = Modifier.weight(1f)
                 ) {
@@ -162,6 +297,11 @@ fun TemplateCard(
                 }
                 IconButton(onClick = onExport) {
                     Icon(Icons.Default.FileDownload, contentDescription = "导出")
+                }
+                if (!template.isDefault) {
+                    IconButton(onClick = onSetDefault) {
+                        Icon(Icons.Default.CheckCircle, contentDescription = "设为默认")
+                    }
                 }
                 IconButton(onClick = onDelete) {
                     Icon(
@@ -178,7 +318,7 @@ fun TemplateCard(
 @Composable
 fun CreateTemplateDialog(
     onDismiss: () -> Unit,
-    onConfirm: () -> Unit
+    onConfirm: (String, String) -> Unit
 ) {
     var name by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
@@ -207,7 +347,7 @@ fun CreateTemplateDialog(
         },
         confirmButton = {
             TextButton(
-                onClick = onConfirm,
+                onClick = { onConfirm(name, description) },
                 enabled = name.isNotBlank()
             ) {
                 Text("创建")
@@ -222,9 +362,56 @@ fun CreateTemplateDialog(
 }
 
 @Composable
+fun EditTemplateDialog(
+    template: Template,
+    onDismiss: () -> Unit,
+    onConfirm: (String, String) -> Unit
+) {
+    var name by remember { mutableStateOf(template.name) }
+    var description by remember { mutableStateOf(template.description) }
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("编辑模板") },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("模板名称") },
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text("模板描述") },
+                    minLines = 2
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onConfirm(name, description) },
+                enabled = name.isNotBlank()
+            ) {
+                Text("保存")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("取消")
+            }
+        }
+    )
+}
+
+@Composable
 fun ImportTemplateDialog(
     onDismiss: () -> Unit,
-    onConfirm: () -> Unit
+    onConfirm: (String) -> Unit
 ) {
     var jsonText by remember { mutableStateOf("") }
     
@@ -249,7 +436,7 @@ fun ImportTemplateDialog(
         },
         confirmButton = {
             TextButton(
-                onClick = onConfirm,
+                onClick = { onConfirm(jsonText) },
                 enabled = jsonText.isNotBlank()
             ) {
                 Text("导入")

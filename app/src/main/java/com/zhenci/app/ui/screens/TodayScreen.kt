@@ -68,30 +68,10 @@ fun TodayScreen() {
     val completedCount = tasks.count { it.isCompleted }
     val completionRate = if (tasks.isNotEmpty()) (completedCount * 100 / tasks.size) else 0
     
-    // 检查是否有未完成的任务需要提醒
+    // 检查是否有未完成的任务需要提醒 - 只在任务时间到达时提醒
     LaunchedEffect(tasks) {
-        val incompleteTasks = tasks.filter { !it.isCompleted && it.isEnabled }
-        if (incompleteTasks.isNotEmpty()) {
-            // 找到最接近当前时间的任务
-            val now = LocalTime.now()
-            val currentMinutes = now.hour * 60 + now.minute
-            
-            val upcomingTask = incompleteTasks.minByOrNull { task ->
-                val taskMinutes = task.hour * 60 + task.minute
-                val diff = taskMinutes - currentMinutes
-                if (diff >= 0) diff else Int.MAX_VALUE // 只找未来的任务
-            }
-            
-            // 如果任务时间在当前时间前后5分钟内，显示提醒
-            upcomingTask?.let { task ->
-                val taskMinutes = task.hour * 60 + task.minute
-                val diff = kotlin.math.abs(taskMinutes - currentMinutes)
-                if (diff <= 5 && !showReminderDialog) {
-                    reminderTask = task
-                    showReminderDialog = true
-                }
-            }
-        }
+        // 这个逻辑现在由 AlarmReceiver 触发，这里不再自动显示弹窗
+        // 保留这个 LaunchedEffect 是为了防止 Compose 警告
     }
 
     Scaffold(
