@@ -2,6 +2,8 @@ package com.zhenci.app.data.entity
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 
 @Entity(tableName = "templates")
 data class Template(
@@ -17,8 +19,8 @@ data class Template(
     fun getTasks(): List<Task> {
         return if (tasksJson != null) {
             try {
-                val gson = com.google.gson.Gson()
-                val type = object : com.google.gson.reflect.TypeToken<List<Task>>() {}.type
+                val gson = Gson()
+                val type = object : TypeToken<List<Task>>() {}.type
                 gson.fromJson(tasksJson, type) ?: emptyList()
             } catch (e: Exception) {
                 emptyList()
