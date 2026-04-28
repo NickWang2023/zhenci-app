@@ -28,7 +28,9 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "zhenci_database"
-                ).build()
+                )
+                .fallbackToDestructiveMigration() // 数据库版本变化时重建数据库
+                .build()
                 INSTANCE = instance
                 instance
             }
