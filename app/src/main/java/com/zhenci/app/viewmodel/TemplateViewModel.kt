@@ -72,8 +72,7 @@ class TemplateViewModel(application: Application) : AndroidViewModel(application
     fun applyTemplate(template: Template, onSuccess: () -> Unit = {}) {
         viewModelScope.launch {
             // 获取模板中的任务
-            val templateWithTasks = templateDao.getTemplateWithTasks(template.id)
-            val tasks = templateWithTasks?.tasks ?: emptyList()
+            val tasks = template.getTasks()
             
             if (tasks.isNotEmpty()) {
                 // 将模板任务添加到任务表
