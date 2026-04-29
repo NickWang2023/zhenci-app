@@ -83,6 +83,34 @@ jobs:
         echo "Build exit code: $BUILD_EXIT_CODE"
         exit $BUILD_EXIT_CODE
         
+    - name: Sign Debug APK
+      run: |
+        echo "=== Generating debug keystore ==="
+        # 生成调试密钥库（如果还没有）
+        mkdir -p ~/.android
+        if [ ! -f ~/.android/debug.keystore ]; then
+          keytool -genkey -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+        fi
+        
+        echo "=== Signing APK with debug key ==="
+        cd app/build/outputs/apk/debug/
+        
+        # 找到未签名的 APK
+        for apk in *.apk; do
+          if [ -f "$apk" ]; then
+            echo "Signing: $apk"
+            # 使用 apksigner 签名
+            ${ANDROID_SDK_ROOT}/build-tools/34.0.0/apksigner sign --ks ~/.android/debug.keystore --ks-pass pass:android --key-pass pass:android --in "$apk" --out "signed-$apk"
+            if [ -f "signed-$apk" ]; then
+              mv "signed-$apk" "$apk"
+              echo "Signed: $apk"
+            fi
+          fi
+        done
+        
+        cd -
+        echo "=== APK signing complete ==="
+        
     - name: Verify APK Signature
       run: |
         echo "=== APK files ==="
