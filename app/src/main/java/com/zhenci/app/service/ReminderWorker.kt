@@ -44,10 +44,15 @@ class ReminderWorker(
         wakeLock.acquire(60000) // 延长到60秒，确保语音播报完成
 
         try {
-            Log.d(TAG, "doWork: 准备显示通知")
-            // 显示通知
+            Log.d(TAG, "doWork: 准备显示提醒弹窗")
+            
+            // 启动 ReminderActivity 显示弹窗
+            startReminderActivity(applicationContext, taskId, content)
+            
+            Log.d(TAG, "doWork: 提醒弹窗已启动")
+            
+            // 显示系统通知（作为备用）
             showNotification(applicationContext, "针刺提醒", content, taskId)
-            Log.d(TAG, "doWork: 通知已显示")
             
             // 播放提示音
             playAlarmSound(applicationContext)
@@ -69,6 +74,26 @@ class ReminderWorker(
         } finally {
             wakeLock.release()
         }
+    }
+
+    /**
+     * 启动 ReminderActivity 显示提醒弹窗
+     */
+    private fun startReminderActivity(context: Context, taskId: Long, content: String) {
+        val intent = android.content.Intent(context, com.zhenci.app.ReminderActivity::class.java).apply {
+            flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or
+                    android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                    android.content.Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS
+            putExtra("task_id", taskId)
+            putExtra("task_content", content)
+            // 解析时间
+            val timePart = content.substringBefore(" ")
+            val hour = timePart.substringBefore(":").toIntOrNull() ?: 9
+            val minute = timePart.substringAfter(":").toIntOrNull() ?: 0
+            putExtra("task_hour", hour)
+            putExtra("task_minute", minute)
+        }
+        context.startActivity(intent)
     }
 
     private fun showNotification(context: Context, title: String, description: String, taskId: Long) {

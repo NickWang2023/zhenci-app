@@ -29,6 +29,7 @@ import android.widget.Toast
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TemplatesScreen(
+    sharedViewModel: TaskViewModel? = null,
     onTemplateClick: ((Template) -> Unit)? = null
 ) {
     val context = LocalContext.current

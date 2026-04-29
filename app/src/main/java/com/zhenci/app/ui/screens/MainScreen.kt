@@ -9,6 +9,9 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
@@ -18,6 +21,8 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.zhenci.app.data.entity.Template
+import com.zhenci.app.viewmodel.TaskViewModel
+import android.app.Application
 
 sealed class Screen(val route: String, val title: String, val icon: androidx.compose.ui.graphics.vector.ImageVector?) {
     object Today : Screen("today", "今日", Icons.Default.CalendarToday)
@@ -36,6 +41,17 @@ sealed class Screen(val route: String, val title: String, val icon: androidx.com
 fun MainScreen() {
     val navController = rememberNavController()
     val items = listOf(Screen.Today, Screen.Templates, Screen.Stats, Screen.Settings)
+    val context = LocalContext.current
+
+    // 创建共享的 TaskViewModel（使用相同的 factory 确保数据同步）
+    val sharedViewModel: TaskViewModel = viewModel(
+        factory = object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
+                return TaskViewModel(context.applicationContext as Application) as T
+            }
+        }
+    )
 
     // 监听当前路由，判断是否显示底部导航栏
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -73,15 +89,16 @@ fun MainScreen() {
             startDestination = Screen.Today.route,
             modifier = Modifier.padding(innerPadding)
         ) {
-            composable(Screen.Today.route) { TodayScreen() }
+            composable(Screen.Today.route) { TodayScreen(sharedViewModel = sharedViewModel) }
             composable(Screen.Templates.route) { 
                 TemplatesScreen(
+                    sharedViewModel = sharedViewModel,
                     onTemplateClick = { template ->
                         navController.navigate(Screen.templateDetailRoute(template.id))
                     }
                 ) 
             }
-            composable(Screen.Stats.route) { StatsScreen() }
+            composable(Screen.Stats.route) { StatsScreen(sharedViewModel = sharedViewModel) }
             composable(Screen.Settings.route) { SettingsScreen() }
             composable(
                 route = Screen.TemplateDetail.route,

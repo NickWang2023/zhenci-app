@@ -25,9 +25,9 @@ import android.app.Application
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun StatsScreen() {
+fun StatsScreen(sharedViewModel: TaskViewModel? = null) {
     val context = LocalContext.current
-    val viewModel: TaskViewModel = viewModel(
+    val viewModel: TaskViewModel = sharedViewModel ?: viewModel(
         factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {

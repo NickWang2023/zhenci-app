@@ -33,10 +33,10 @@ import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TodayScreen() {
+fun TodayScreen(sharedViewModel: TaskViewModel? = null) {
     val context = LocalContext.current
     
-    val viewModel: TaskViewModel = viewModel(
+    val viewModel: TaskViewModel = sharedViewModel ?: viewModel(
         factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
