@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.zhenci.app.data.database.AppDatabase
 import com.zhenci.app.data.entity.Task
 import com.zhenci.app.data.entity.UserStats
+import com.zhenci.app.service.AlarmScheduler
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -41,6 +42,20 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
             checkAndResetDailyStats()
             // 初始化默认任务（如果数据库为空）
             initializeDefaultTasks()
+            // 重新为所有启用的任务注册闹钟（修复应用重装/重启后闹钟丢失的问题）
+            rescheduleAllAlarms()
+        }
+    }
+
+    /**
+     * 重新为所有启用的任务注册闹钟
+     * 解决应用重装、系统重启后闹钟丢失的问题
+     */
+    private suspend fun rescheduleAllAlarms() {
+        val alarmScheduler = AlarmScheduler(getApplication())
+        val enabledTasks = taskDao.getAllTasksSync().filter { it.isEnabled && it.templateId == 0L }
+        enabledTasks.forEach { task ->
+            alarmScheduler.scheduleTask(task)
         }
     }
     

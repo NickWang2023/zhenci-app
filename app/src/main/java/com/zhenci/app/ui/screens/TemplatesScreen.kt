@@ -28,7 +28,9 @@ import android.widget.Toast
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TemplatesScreen() {
+fun TemplatesScreen(
+    onTemplateClick: ((Template) -> Unit)? = null
+) {
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
     
@@ -49,6 +51,8 @@ fun TemplatesScreen() {
     var editingTemplate by remember { mutableStateOf<Template?>(null) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var deletingTemplate by remember { mutableStateOf<Template?>(null) }
+    var showApplyConfirm by remember { mutableStateOf(false) }
+    var applyingTemplate by remember { mutableStateOf<Template?>(null) }
 
     Scaffold(
         topBar = {
@@ -109,6 +113,9 @@ fun TemplatesScreen() {
                 items(templates, key = { it.id }) { template ->
                     TemplateCard(
                         template = template,
+                        onClick = {
+                            onTemplateClick?.invoke(template)
+                        },
                         onEdit = { 
                             editingTemplate = template
                             showEditDialog = true
@@ -127,9 +134,8 @@ fun TemplatesScreen() {
                             Toast.makeText(context, "模板已复制到剪贴板", Toast.LENGTH_SHORT).show()
                         },
                         onApply = { 
-                            viewModel.applyTemplate(template) {
-                                Toast.makeText(context, "模板已应用到今日任务", Toast.LENGTH_SHORT).show()
-                            }
+                            applyingTemplate = template
+                            showApplyConfirm = true
                         },
                         onSetDefault = {
                             viewModel.setDefaultTemplate(template.id)
@@ -225,12 +231,38 @@ fun TemplatesScreen() {
             }
         )
     }
+
+    // 应用模板确认对话框
+    if (showApplyConfirm && applyingTemplate != null) {
+        ApplyTemplateDialog(
+            templateName = applyingTemplate!!.name,
+            onDismiss = {
+                showApplyConfirm = false
+                applyingTemplate = null
+            },
+            onConfirm = { clearExisting ->
+                applyingTemplate?.let { template ->
+                    viewModel.applyTemplate(template, clearExisting) {
+                        val message = if (clearExisting) {
+                            "模板已应用，已清空原有任务"
+                        } else {
+                            "模板已应用到今日任务"
+                        }
+                        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                    }
+                }
+                showApplyConfirm = false
+                applyingTemplate = null
+            }
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TemplateCard(
     template: Template,
+    onClick: () -> Unit,
     onEdit: () -> Unit,
     onDuplicate: () -> Unit,
     onDelete: () -> Unit,
@@ -240,7 +272,8 @@ fun TemplateCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        onClick = onClick
     ) {
         Column(
             modifier = Modifier
@@ -398,6 +431,72 @@ fun EditTemplateDialog(
                 enabled = name.isNotBlank()
             ) {
                 Text("保存")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("取消")
+            }
+        }
+    )
+}
+
+@Composable
+fun ApplyTemplateDialog(
+    templateName: String,
+    onDismiss: () -> Unit,
+    onConfirm: (clearExisting: Boolean) -> Unit
+) {
+    var clearExisting by remember { mutableStateOf(false) }
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("应用模板") },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    "确定要应用模板「$templateName」吗？",
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "清空现有任务",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Switch(
+                        checked = clearExisting,
+                        onCheckedChange = { clearExisting = it }
+                    )
+                }
+                
+                if (clearExisting) {
+                    Text(
+                        "⚠️ 将删除所有现有任务，只保留模板中的任务",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                } else {
+                    Text(
+                        "模板任务将添加到现有任务之后",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirm(clearExisting) }
+            ) {
+                Text("应用")
             }
         },
         dismissButton = {

@@ -69,16 +69,23 @@ class TemplateViewModel(application: Application) : AndroidViewModel(application
     }
     
     // 应用模板 - 将模板的任务添加到今日任务
-    fun applyTemplate(template: Template, onSuccess: () -> Unit = {}) {
+    fun applyTemplate(template: Template, clearExisting: Boolean = false, onSuccess: () -> Unit = {}) {
         viewModelScope.launch {
-            // 获取模板中的任务
-            val tasks = template.getTasks()
+            // 从数据库获取模板关联的任务（通过 templateId 关联）
+            val templateTasks = taskDao.getAllTasksSync().filter { it.templateId == template.id }
             
-            if (tasks.isNotEmpty()) {
-                // 将模板任务添加到任务表
-                tasks.forEach { task ->
+            if (templateTasks.isNotEmpty()) {
+                // 如果要求清空现有任务，先删除所有非模板任务
+                if (clearExisting) {
+                    val existingTasks = taskDao.getAllTasksSync().filter { it.templateId == 0L }
+                    existingTasks.forEach { taskDao.deleteTask(it) }
+                }
+                
+                // 将模板任务复制到今日任务（templateId = 0 表示是今日任务）
+                templateTasks.forEach { task ->
                     val newTask = task.copy(
-                        id = 0, // 新任务
+                        id = 0, // 新任务，让数据库自动生成ID
+                        templateId = 0, // 0 表示这是今日任务，不是模板任务
                         isCompleted = false,
                         isEnabled = true
                     )
