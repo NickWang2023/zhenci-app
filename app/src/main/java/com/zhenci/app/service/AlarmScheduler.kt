@@ -30,6 +30,8 @@ class AlarmScheduler(private val context: Context) {
         val intent = Intent(context, AlarmReceiver::class.java).apply {
             putExtra("task_id", task.id)
             putExtra("task_content", task.content)
+            putExtra("task_hour", task.hour)
+            putExtra("task_minute", task.minute)
         }
 
         val pendingIntent = PendingIntent.getBroadcast(
@@ -102,6 +104,8 @@ class AlarmScheduler(private val context: Context) {
         val intent = Intent(context, AlarmReceiver::class.java).apply {
             putExtra("task_id", task.id)
             putExtra("task_content", task.content)
+            putExtra("task_hour", task.hour)
+            putExtra("task_minute", task.minute)
         }
 
         val pendingIntent = PendingIntent.getBroadcast(

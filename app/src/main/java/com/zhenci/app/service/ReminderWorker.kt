@@ -33,7 +33,9 @@ class ReminderWorker(
     override suspend fun doWork(): Result {
         val taskId = inputData.getLong("task_id", -1)
         val content = inputData.getString("task_content") ?: "针刺提醒"
-        Log.d(TAG, "doWork: 开始执行任务 $taskId - $content")
+        val hour = inputData.getInt("task_hour", 0)
+        val minute = inputData.getInt("task_minute", 0)
+        Log.d(TAG, "doWork: 开始执行任务 $taskId - $content at $hour:$minute")
         
         // 唤醒屏幕
         val powerManager = applicationContext.getSystemService(Context.POWER_SERVICE) as PowerManager
@@ -47,7 +49,7 @@ class ReminderWorker(
             Log.d(TAG, "doWork: 准备显示提醒弹窗")
             
             // 启动 ReminderActivity 显示弹窗
-            startReminderActivity(applicationContext, taskId, content)
+            startReminderActivity(applicationContext, taskId, content, hour, minute)
             
             Log.d(TAG, "doWork: 提醒弹窗已启动")
             
@@ -79,17 +81,13 @@ class ReminderWorker(
     /**
      * 启动 ReminderActivity 显示提醒弹窗
      */
-    private fun startReminderActivity(context: Context, taskId: Long, content: String) {
+    private fun startReminderActivity(context: Context, taskId: Long, content: String, hour: Int, minute: Int) {
         val intent = android.content.Intent(context, com.zhenci.app.ReminderActivity::class.java).apply {
             flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or
                     android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP or
                     android.content.Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS
             putExtra("task_id", taskId)
             putExtra("task_content", content)
-            // 解析时间
-            val timePart = content.substringBefore(" ")
-            val hour = timePart.substringBefore(":").toIntOrNull() ?: 9
-            val minute = timePart.substringAfter(":").toIntOrNull() ?: 0
             putExtra("task_hour", hour)
             putExtra("task_minute", minute)
         }

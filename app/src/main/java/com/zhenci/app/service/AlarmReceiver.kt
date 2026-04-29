@@ -18,12 +18,16 @@ class AlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val taskId = intent.getLongExtra("task_id", -1)
         val content = intent.getStringExtra("task_content") ?: "针刺"
-        Log.d(TAG, "onReceive: 收到闹钟广播 taskId=$taskId, content=$content")
+        val hour = intent.getIntExtra("task_hour", 0)
+        val minute = intent.getIntExtra("task_minute", 0)
+        Log.d(TAG, "onReceive: 收到闹钟广播 taskId=$taskId, content=$content, time=$hour:$minute")
         
         // 通过 WorkManager 执行提醒任务
         val inputData = Data.Builder()
             .putLong("task_id", taskId)
             .putString("task_content", content)
+            .putInt("task_hour", hour)
+            .putInt("task_minute", minute)
             .build()
 
         val workRequest = OneTimeWorkRequestBuilder<ReminderWorker>()
