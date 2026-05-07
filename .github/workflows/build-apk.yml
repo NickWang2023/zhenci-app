@@ -55,31 +55,45 @@ jobs:
         SCRIPT
         chmod +x gradlew
 
-    - name: Generate Keystore
+    - name: Build Debug APK
       run: |
-        mkdir -p app
+        ./gradlew :app:assembleDebug --no-daemon --stacktrace 2>&1 | tee build.log
+        exit ${PIPESTATUS[0]}
+        
+    - name: Sign Debug APK
+      run: |
+        echo "=== Generating debug keystore ==="
         keytool -genkey -v \
-          -keystore app/release.keystore \
-          -storepass zhenci123 \
-          -alias zhenci \
-          -keypass zhenci123 \
+          -keystore ~/.android/debug.keystore \
+          -storepass android \
+          -alias androiddebugkey \
+          -keypass android \
           -keyalg RSA \
           -keysize 2048 \
           -validity 10000 \
-          -dname "CN=Zhenci App,O=Zhenci,C=CN"
-        ls -la app/release.keystore
-
-    - name: Build Release APK
-      run: |
-        ./gradlew :app:assembleRelease --no-daemon --stacktrace 2>&1 | tee build.log
-        exit ${PIPESTATUS[0]}
+          -dname "CN=Android Debug,O=Android,C=US"
+        
+        echo "=== Signing APK ==="
+        cd app/build/outputs/apk/debug/
+        for apk in *.apk; do
+          if [ -f "$apk" ]; then
+            echo "Signing: $apk"
+            zip -d "$apk" "META-INF/*.SF" "META-INF/*.RSA" "META-INF/*.MF" 2>/dev/null || true
+            jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 \
+              -keystore ~/.android/debug.keystore \
+              -storepass android \
+              -keypass android \
+              "$apk" androiddebugkey
+          fi
+        done
+        cd -
         
     - name: Verify APK
       run: |
         echo "=== APK files ==="
         find . -name "*.apk" -type f 2>/dev/null | xargs ls -la
         
-    - name: Show build log
+    - name: Show build log on failure
       if: failure()
       run: |
         echo "=== BUILD LOG (last 100 lines) ==="
@@ -93,9 +107,9 @@ jobs:
         path: build.log
         if-no-files-found: ignore
       
-    - name: Upload Release APK
+    - name: Upload Debug APK
       uses: actions/upload-artifact@v4
       if: success()
       with:
-        name: zhenci-release-apk
-        path: app/build/outputs/apk/release/*.apk
+        name: zhenci-debug-apk
+        path: app/build/outputs/apk/debug/*.apk
