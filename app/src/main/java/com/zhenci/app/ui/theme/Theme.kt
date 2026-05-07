@@ -15,18 +15,76 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
+// ============================================
+// 深色配色方案 - Dark Color Scheme
+// ============================================
+
 private val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
-    secondary = PurpleGrey80,
-    tertiary = Pink80
+    primary = DeepBlue,
+    onPrimary = White,
+    primaryContainer = BrightBlue,
+    onPrimaryContainer = White,
+    secondary = ProfessionalGreen,
+    onSecondary = White,
+    secondaryContainer = CalmGreen,
+    onSecondaryContainer = White,
+    background = DarkGray,
+    onBackground = White,
+    surface = Color(0xFF1F2937),
+    onSurface = White,
+    surfaceVariant = Color(0xFF374151),
+    onSurfaceVariant = LightGray,
+    error = ZhenciError,
+    onError = White,
+    outline = MediumGray,
+    outlineVariant = PaleGray
 )
 
+// ============================================
+// 浅色配色方案 - Light Color Scheme (默认)
+// ============================================
+
 private val LightColorScheme = lightColorScheme(
-    primary = ZhenciPrimary,
-    secondary = ZhenciSecondary,
-    background = ZhenciBackground,
-    surface = ZhenciSurface,
-    error = ZhenciError
+    // 主色
+    primary = DeepBlue,
+    onPrimary = White,
+    primaryContainer = BrightBlue,
+    onPrimaryContainer = White,
+
+    // 次色
+    secondary = ProfessionalGreen,
+    onSecondary = White,
+    secondaryContainer = CalmGreen,
+    onSecondaryContainer = White,
+
+    // 第三色（用于强调）
+    tertiary = BrandBlue,
+    onTertiary = White,
+    tertiaryContainer = BrightBlue,
+    onTertiaryContainer = White,
+
+    // 背景
+    background = LightGray,
+    onBackground = DarkGray,
+
+    // 表面
+    surface = White,
+    onSurface = DarkGray,
+    surfaceVariant = LightGray,
+    onSurfaceVariant = MediumGray,
+
+    // 错误
+    error = ZhenciError,
+    onError = White,
+
+    // 轮廓
+    outline = PaleGray,
+    outlineVariant = Color(0xFFF3F4F6),
+
+    // 反色表面
+    inverseSurface = DarkGray,
+    inverseOnSurface = White,
+    inversePrimary = BrightBlue
 )
 
 @Composable
@@ -43,12 +101,15 @@ fun ZhenciTheme(
         darkTheme -> DarkColorScheme
         else -> LightColorScheme
     }
+
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
+            // 状态栏使用主色
             window.statusBarColor = colorScheme.primary.toArgb()
-            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = darkTheme
+            // 状态栏图标颜色根据主题调整
+            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
         }
     }
 
