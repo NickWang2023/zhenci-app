@@ -144,5 +144,83 @@ data class Template(
 
 ---
 
+---
+
+## 🐛 2026-05-07 新增Bug修复
+
+### 问题4：模板应用时清除旧任务不生效 ❌ 已修复
+
+**问题描述**：
+1. 应用模板时勾选「清空现有任务」，但旧任务仍然存在
+2. 首页出现重复任务（新旧任务并列显示）
+3. 已清除的旧任务仍会触发提醒
+
+**根本原因**：
+- `TemplateViewModel.applyTemplate()` 删除旧任务时**只删除了数据库记录**
+- **没有取消已设置的闹钟**，导致：
+  1. 闹钟仍然在系统中存在
+  2. 当 AlarmReceiver 触发时，会再次显示提醒
+  3. 看起来像是任务没有被清除
+
+**修复方案**：
+1. 删除旧任务前，先调用 `alarmScheduler.cancelTask(task.id)` 取消闹钟
+2. 添加新任务后，调用 `alarmScheduler.scheduleTask(insertedTask)` 设置新闹钟
+
+**修改文件**：
+- `app/src/main/java/com/zhenci/app/viewmodel/TemplateViewModel.kt`
+
+**关键代码变更**：
+```kotlin
+// 如果要求清空现有任务，先删除所有非模板任务并取消它们的闹钟
+if (clearExisting) {
+    val existingTasks = taskDao.getAllTasksSync().filter { it.templateId == 0L }
+    existingTasks.forEach { task ->
+        // 取消旧任务的闹钟
+        alarmScheduler.cancelTask(task.id)
+        // 从数据库删除任务
+        taskDao.deleteTask(task)
+    }
+}
+
+// 将模板任务复制到今日任务
+templateTasks.forEach { task ->
+    val newTask = task.copy(
+        id = 0,
+        templateId = 0,
+        isCompleted = false,
+        isEnabled = true
+    )
+    val newTaskId = taskDao.insertTask(newTask)
+    // 为新任务设置闹钟
+    val insertedTask = newTask.copy(id = newTaskId)
+    alarmScheduler.scheduleTask(insertedTask)
+}
+```
+
+### 问题5：已删除任务仍会提醒 ❌ 已修复
+
+**问题描述**：
+- 清除旧任务后，到了提醒时间，旧任务的提醒弹窗仍然会出现
+
+**根本原因**：
+- 同上：删除任务时没有取消对应的 AlarmManager 闹钟
+- AlarmManager 的 PendingIntent 仍然存在于系统中
+
+**修复方案**：
+- 与问题4一起修复，确保删除任务时同步取消闹钟
+
+---
+
+## ✅ 2026-05-07 测试验证项
+
+### 模板应用功能
+- [ ] 应用模板时勾选「清空现有任务」，旧任务被正确删除
+- [ ] 应用模板后，首页只显示新模板任务，没有重复
+- [ ] 已清除的旧任务不再触发提醒
+- [ ] 新模板任务能正常提醒
+
+---
+
 *报告生成时间：2026-04-28*
-*修复完成时间：2026-04-28*
+*首次修复完成时间：2026-04-28*
+*2026-05-07 Bug修复时间：2026-05-07*

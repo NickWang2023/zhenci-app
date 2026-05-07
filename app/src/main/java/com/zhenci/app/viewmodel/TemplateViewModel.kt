@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.zhenci.app.data.database.AppDatabase
 import com.zhenci.app.data.entity.Task
 import com.zhenci.app.data.entity.Template
+import com.zhenci.app.service.AlarmScheduler
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import com.google.gson.Gson
@@ -71,14 +72,21 @@ class TemplateViewModel(application: Application) : AndroidViewModel(application
     // 应用模板 - 将模板的任务添加到今日任务
     fun applyTemplate(template: Template, clearExisting: Boolean = false, onSuccess: () -> Unit = {}) {
         viewModelScope.launch {
+            val alarmScheduler = AlarmScheduler(getApplication())
+            
             // 从数据库获取模板关联的任务（通过 templateId 关联）
             val templateTasks = taskDao.getAllTasksSync().filter { it.templateId == template.id }
             
             if (templateTasks.isNotEmpty()) {
-                // 如果要求清空现有任务，先删除所有非模板任务
+                // 如果要求清空现有任务，先删除所有非模板任务并取消它们的闹钟
                 if (clearExisting) {
                     val existingTasks = taskDao.getAllTasksSync().filter { it.templateId == 0L }
-                    existingTasks.forEach { taskDao.deleteTask(it) }
+                    existingTasks.forEach { task ->
+                        // 取消旧任务的闹钟
+                        alarmScheduler.cancelTask(task.id)
+                        // 从数据库删除任务
+                        taskDao.deleteTask(task)
+                    }
                 }
                 
                 // 将模板任务复制到今日任务（templateId = 0 表示是今日任务）
@@ -89,7 +97,10 @@ class TemplateViewModel(application: Application) : AndroidViewModel(application
                         isCompleted = false,
                         isEnabled = true
                     )
-                    taskDao.insertTask(newTask)
+                    val newTaskId = taskDao.insertTask(newTask)
+                    // 为新任务设置闹钟
+                    val insertedTask = newTask.copy(id = newTaskId)
+                    alarmScheduler.scheduleTask(insertedTask)
                 }
                 onSuccess()
             }
