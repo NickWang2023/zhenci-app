@@ -36,10 +36,7 @@ jobs:
 
     - name: Setup Gradle Wrapper
       run: |
-        echo "=== Setting up Gradle Wrapper ==="
         mkdir -p gradle/wrapper
-        
-        # 创建 gradle-wrapper.properties
         cat > gradle/wrapper/gradle-wrapper.properties << 'EOF'
         distributionBase=GRADLE_USER_HOME
         distributionPath=wrapper/dists
@@ -49,27 +46,20 @@ jobs:
         zipStoreBase=GRADLE_USER_HOME
         zipStorePath=wrapper/dists
         EOF
-        
-        # 下载 wrapper jar
         curl -L -o gradle/wrapper/gradle-wrapper.jar \
           "https://raw.githubusercontent.com/gradle/gradle/v8.5.0/gradle/wrapper/gradle-wrapper.jar"
-        
-        # 创建正确的 gradlew 脚本
         cat > gradlew << 'SCRIPT'
         #!/bin/sh
         APP_HOME=$(cd "$(dirname "$0")" && pwd)
         java -Xmx2048m -Xms512m -classpath "$APP_HOME/gradle/wrapper/gradle-wrapper.jar" org.gradle.wrapper.GradleWrapperMain "$@"
         SCRIPT
-        
         chmod +x gradlew
-        echo "=== Gradle Wrapper Setup Complete ==="
 
-    - name: Generate Release Keystore
+    - name: Generate Keystore
       run: |
-        echo "=== Generating release keystore ==="
-        mkdir -p ~/.android
+        mkdir -p app
         keytool -genkey -v \
-          -keystore ~/.android/release.keystore \
+          -keystore app/release.keystore \
           -storepass zhenci123 \
           -alias zhenci \
           -keypass zhenci123 \
@@ -77,142 +67,23 @@ jobs:
           -keysize 2048 \
           -validity 10000 \
           -dname "CN=Zhenci App,O=Zhenci,C=CN"
-        echo "✓ Release keystore created"
-        ls -la ~/.android/release.keystore
-
-    - name: Create signing.properties
-      run: |
-        cat > signing.properties << 'EOF'
-        storeFile=/home/runner/.android/release.keystore
-        storePassword=zhenci123
-        keyAlias=zhenci
-        keyPassword=zhenci123
-        EOF
-        cat signing.properties
-
-    - name: Modify build.gradle.kts for signing
-      run: |
-        cat > app/build.gradle.kts << 'EOF'
-        plugins {
-            id("com.android.application")
-            id("org.jetbrains.kotlin.android")
-            id("com.google.devtools.ksp")
-        }
-
-        android {
-            namespace = "com.zhenci.app"
-            compileSdk = 33
-
-            defaultConfig {
-                applicationId = "com.zhenci.app"
-                minSdk = 21
-                targetSdk = 33
-                versionCode = 3
-                versionName = "1.0.2"
-
-                testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-                vectorDrawables {
-                    useSupportLibrary = true
-                }
-            }
-
-            signingConfigs {
-                create("release") {
-                    storeFile = file("/home/runner/.android/release.keystore")
-                    storePassword = "zhenci123"
-                    keyAlias = "zhenci"
-                    keyPassword = "zhenci123"
-                }
-            }
-
-            buildTypes {
-                debug {
-                    isDebuggable = true
-                }
-                release {
-                    isMinifyEnabled = false
-                    proguardFiles(
-                        getDefaultProguardFile("proguard-android-optimize.txt"),
-                        "proguard-rules.pro"
-                    )
-                    signingConfig = signingConfigs.getByName("release")
-                }
-            }
-            compileOptions {
-                sourceCompatibility = JavaVersion.VERSION_17
-                targetCompatibility = JavaVersion.VERSION_17
-            }
-            kotlinOptions {
-                jvmTarget = "17"
-            }
-            buildFeatures {
-                compose = true
-            }
-            composeOptions {
-                kotlinCompilerExtensionVersion = "1.5.8"
-            }
-            packaging {
-                resources {
-                    excludes += "/META-INF/{AL2.0,LGPL2.1}"
-                }
-            }
-        }
-
-        dependencies {
-            implementation("androidx.core:core-ktx:1.12.0")
-            implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
-            implementation("androidx.activity:activity-compose:1.8.2")
-            implementation(platform("androidx.compose:compose-bom:2024.02.00"))
-            implementation("androidx.compose.ui:ui")
-            implementation("androidx.compose.ui:ui-graphics")
-            implementation("androidx.compose.ui:ui-tooling-preview")
-            implementation("androidx.compose.material3:material3")
-            implementation("androidx.compose.material:material-icons-extended")
-            implementation("androidx.navigation:navigation-compose:2.7.7")
-            implementation("androidx.room:room-runtime:2.6.1")
-            implementation("androidx.room:room-ktx:2.6.1")
-            ksp("androidx.room:room-compiler:2.6.1")
-            implementation("androidx.work:work-runtime-ktx:2.9.0")
-            implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
-            implementation("com.google.code.gson:gson:2.10.1")
-            testImplementation("junit:junit:4.13.2")
-            androidTestImplementation("androidx.test.ext:junit:1.1.5")
-            androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
-            androidTestImplementation(platform("androidx.compose:compose-bom:2024.02.00"))
-            androidTestImplementation("androidx.compose.ui:ui-test-junit4")
-            debugImplementation("androidx.compose.ui:ui-tooling")
-            debugImplementation("androidx.compose.ui:ui-test-manifest")
-        }
-        EOF
-        echo "=== build.gradle.kts updated ==="
-        cat app/build.gradle.kts
+        ls -la app/release.keystore
 
     - name: Build Release APK
       run: |
         ./gradlew :app:assembleRelease --no-daemon --stacktrace 2>&1 | tee build.log
-        BUILD_EXIT_CODE=${PIPESTATUS[0]}
-        echo "Build exit code: $BUILD_EXIT_CODE"
-        exit $BUILD_EXIT_CODE
+        exit ${PIPESTATUS[0]}
         
     - name: Verify APK
       run: |
         echo "=== APK files ==="
-        ls -la app/build/outputs/apk/release/
+        find . -name "*.apk" -type f 2>/dev/null | xargs ls -la
         
-        echo "=== Checking APK signature ==="
-        for apk in app/build/outputs/apk/release/*.apk; do
-          echo "Checking: $apk"
-          unzip -l "$apk" | grep -E "META-INF/.*\.(RSA|SF|MF)" || echo "No signature files found"
-        done
-        
-    - name: Show build results
+    - name: Show build log
+      if: failure()
       run: |
-        echo "=== BUILD LOG (last 50 lines) ==="
-        tail -50 build.log
-        echo "=== END LOG ==="
-        echo "=== Looking for APK files ==="
-        find . -name "*.apk" -type f 2>/dev/null
+        echo "=== BUILD LOG (last 100 lines) ==="
+        tail -100 build.log
         
     - name: Upload build log
       uses: actions/upload-artifact@v4
@@ -228,4 +99,3 @@ jobs:
       with:
         name: zhenci-release-apk
         path: app/build/outputs/apk/release/*.apk
-        if-no-files-found: warn
