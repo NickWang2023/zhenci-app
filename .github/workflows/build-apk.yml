@@ -34,26 +34,6 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-gradle-
 
-    - name: Generate Debug Keystore
-      run: |
-        echo "=== Generating debug keystore ==="
-        mkdir -p ~/.android
-        if [ ! -f ~/.android/debug.keystore ]; then
-          keytool -genkey -v \
-            -keystore ~/.android/debug.keystore \
-            -storepass android \
-            -alias androiddebugkey \
-            -keypass android \
-            -keyalg RSA \
-            -keysize 2048 \
-            -validity 10000 \
-            -dname "CN=Android Debug,O=Android,C=US"
-          echo "✓ Debug keystore created"
-        else
-          echo "✓ Debug keystore already exists"
-        fi
-        ls -la ~/.android/debug.keystore
-        
     - name: Setup Gradle Wrapper
       run: |
         echo "=== Setting up Gradle Wrapper ==="
@@ -91,6 +71,43 @@ jobs:
         echo "Build exit code: $BUILD_EXIT_CODE"
         exit $BUILD_EXIT_CODE
         
+    - name: Generate Debug Keystore and Sign APK
+      run: |
+        echo "=== Generating debug keystore ==="
+        mkdir -p ~/.android
+        keytool -genkey -v \
+          -keystore ~/.android/debug.keystore \
+          -storepass android \
+          -alias androiddebugkey \
+          -keypass android \
+          -keyalg RSA \
+          -keysize 2048 \
+          -validity 10000 \
+          -dname "CN=Android Debug,O=Android,C=US"
+        echo "✓ Debug keystore created"
+        ls -la ~/.android/debug.keystore
+        
+        echo "=== Signing APK with jarsigner ==="
+        cd app/build/outputs/apk/debug/
+        
+        for apk in *.apk; do
+          if [ -f "$apk" ]; then
+            echo "Signing: $apk"
+            # 先删除已有的签名
+            zip -d "$apk" "META-INF/*.SF" "META-INF/*.RSA" "META-INF/*.MF" 2>/dev/null || true
+            # 使用jarsigner签名
+            jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 \
+              -keystore ~/.android/debug.keystore \
+              -storepass android \
+              -keypass android \
+              "$apk" androiddebugkey
+            echo "✓ Signed: $apk"
+          fi
+        done
+        
+        cd -
+        echo "=== APK signing complete ==="
+        
     - name: Verify APK
       run: |
         echo "=== APK files ==="
@@ -105,6 +122,9 @@ jobs:
           # 使用apksigner验证
           echo "-- apksigner verify:"
           ${ANDROID_SDK_ROOT}/build-tools/34.0.0/apksigner verify -v "$apk" 2>&1 || echo "apksigner verify failed"
+          # 使用jarsigner验证
+          echo "-- jarsigner verify:"
+          jarsigner -verify -verbose -certs "$apk" 2>&1 | head -20 || echo "jarsigner verify failed"
         done
         
     - name: Show build results
