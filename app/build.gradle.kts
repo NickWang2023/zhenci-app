@@ -6,12 +6,12 @@ plugins {
 
 android {
     namespace = "com.zhenci.app"
-    compileSdk = 34
+    compileSdk = 33
 
     defaultConfig {
         applicationId = "com.zhenci.app"
-        minSdk = 24
-        targetSdk = 34
+        minSdk = 21
+        targetSdk = 33
         versionCode = 3
         versionName = "1.0.2"
 
