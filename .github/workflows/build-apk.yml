@@ -24,92 +24,24 @@ jobs:
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3
       
-    - name: Cache Gradle packages
-      uses: actions/cache@v3
-      with:
-        path: |
-          ~/.gradle/caches
-          ~/.gradle/wrapper
-        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-        restore-keys: |
-          ${{ runner.os }}-gradle-
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
 
-    - name: Setup Gradle Wrapper
-      run: |
-        mkdir -p gradle/wrapper
-        cat > gradle/wrapper/gradle-wrapper.properties << 'EOF'
-        distributionBase=GRADLE_USER_HOME
-        distributionPath=wrapper/dists
-        distributionUrl=https\://services.gradle.org/distributions/gradle-8.5-bin.zip
-        networkTimeout=10000
-        validateDistributionUrl=true
-        zipStoreBase=GRADLE_USER_HOME
-        zipStorePath=wrapper/dists
-        EOF
-        curl -L -o gradle/wrapper/gradle-wrapper.jar \
-          "https://raw.githubusercontent.com/gradle/gradle/v8.5.0/gradle/wrapper/gradle-wrapper.jar"
-        cat > gradlew << 'SCRIPT'
-        #!/bin/sh
-        APP_HOME=$(cd "$(dirname "$0")" && pwd)
-        java -Xmx2048m -Xms512m -classpath "$APP_HOME/gradle/wrapper/gradle-wrapper.jar" org.gradle.wrapper.GradleWrapperMain "$@"
-        SCRIPT
-        chmod +x gradlew
-
+    - name: Build with Gradle
+      run: ./gradlew build --no-daemon --stacktrace
+      
     - name: Build Debug APK
+      run: ./gradlew assembleDebug --no-daemon
+      
+    - name: List APK files
       run: |
-        ./gradlew :app:assembleDebug --no-daemon --stacktrace 2>&1 | tee build.log
-        exit ${PIPESTATUS[0]}
-        
-    - name: Sign Debug APK
-      run: |
-        echo "=== Generating debug keystore ==="
-        keytool -genkey -v \
-          -keystore ~/.android/debug.keystore \
-          -storepass android \
-          -alias androiddebugkey \
-          -keypass android \
-          -keyalg RSA \
-          -keysize 2048 \
-          -validity 10000 \
-          -dname "CN=Android Debug,O=Android,C=US"
-        
-        echo "=== Signing APK ==="
-        cd app/build/outputs/apk/debug/
-        for apk in *.apk; do
-          if [ -f "$apk" ]; then
-            echo "Signing: $apk"
-            zip -d "$apk" "META-INF/*.SF" "META-INF/*.RSA" "META-INF/*.MF" 2>/dev/null || true
-            jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 \
-              -keystore ~/.android/debug.keystore \
-              -storepass android \
-              -keypass android \
-              "$apk" androiddebugkey
-          fi
-        done
-        cd -
-        
-    - name: Verify APK
-      run: |
-        echo "=== APK files ==="
+        echo "=== Looking for APK files ==="
         find . -name "*.apk" -type f 2>/dev/null | xargs ls -la
         
-    - name: Show build log on failure
-      if: failure()
-      run: |
-        echo "=== BUILD LOG (last 100 lines) ==="
-        tail -100 build.log
-        
-    - name: Upload build log
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: build-log
-        path: build.log
-        if-no-files-found: ignore
-      
     - name: Upload Debug APK
       uses: actions/upload-artifact@v4
       if: success()
       with:
         name: zhenci-debug-apk
         path: app/build/outputs/apk/debug/*.apk
+        if-no-files-found: warn
