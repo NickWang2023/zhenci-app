@@ -34,16 +34,25 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-gradle-
 
-    - name: Verify Icon Files
+    - name: Generate Debug Keystore
       run: |
-        echo "=== Verifying icon files ==="
-        ls -la app/src/main/res/mipmap-*/ic_launcher.png
-        echo "=== Checking icon file headers ==="
-        for f in app/src/main/res/mipmap-*/ic_launcher.png; do
-          echo "File: $f"
-          file "$f" | head -1
-          head -c 100 "$f" | xxd | head -3
-        done
+        echo "=== Generating debug keystore ==="
+        mkdir -p ~/.android
+        if [ ! -f ~/.android/debug.keystore ]; then
+          keytool -genkey -v \
+            -keystore ~/.android/debug.keystore \
+            -storepass android \
+            -alias androiddebugkey \
+            -keypass android \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US"
+          echo "✓ Debug keystore created"
+        else
+          echo "✓ Debug keystore already exists"
+        fi
+        ls -la ~/.android/debug.keystore
         
     - name: Setup Gradle Wrapper
       run: |
@@ -73,7 +82,6 @@ jobs:
         SCRIPT
         
         chmod +x gradlew
-        
         echo "=== Gradle Wrapper Setup Complete ==="
 
     - name: Build Debug APK
@@ -83,61 +91,7 @@ jobs:
         echo "Build exit code: $BUILD_EXIT_CODE"
         exit $BUILD_EXIT_CODE
         
-    - name: Generate Debug Keystore
-      run: |
-        echo "=== Generating debug keystore ==="
-        mkdir -p ~/.android
-        if [ ! -f ~/.android/debug.keystore ]; then
-          keytool -genkey -v \
-            -keystore ~/.android/debug.keystore \
-            -storepass android \
-            -alias androiddebugkey \
-            -keypass android \
-            -keyalg RSA \
-            -keysize 2048 \
-            -validity 10000 \
-            -dname "CN=Android Debug,O=Android,C=US"
-          echo "Debug keystore created successfully"
-        else
-          echo "Debug keystore already exists"
-        fi
-        ls -la ~/.android/debug.keystore
-        
-    - name: Sign Debug APK
-      run: |
-        echo "=== Checking APK files before signing ==="
-        ls -la app/build/outputs/apk/debug/
-        
-        echo "=== Signing APK with debug key ==="
-        cd app/build/outputs/apk/debug/
-        
-        # 找到未签名的 APK
-        for apk in *.apk; do
-          if [ -f "$apk" ]; then
-            echo "Processing: $apk"
-            # 备份原文件
-            cp "$apk" "unsigned-$apk"
-            # 使用 apksigner 签名
-            ${ANDROID_SDK_ROOT}/build-tools/34.0.0/apksigner sign \
-              --ks ~/.android/debug.keystore \
-              --ks-pass pass:android \
-              --key-pass pass:android \
-              --in "unsigned-$apk" \
-              --out "$apk"
-            if [ $? -eq 0 ]; then
-              echo "✓ Signed successfully: $apk"
-              rm -f "unsigned-$apk"
-            else
-              echo "✗ Signing failed for: $apk"
-              mv "unsigned-$apk" "$apk"
-            fi
-          fi
-        done
-        
-        cd -
-        echo "=== APK signing complete ==="
-        
-    - name: Verify APK Signature
+    - name: Verify APK
       run: |
         echo "=== APK files ==="
         ls -la app/build/outputs/apk/debug/
@@ -146,21 +100,21 @@ jobs:
         for apk in app/build/outputs/apk/debug/*.apk; do
           echo "Checking: $apk"
           # 检查META-INF目录中的签名文件
+          echo "-- Signature files:"
           unzip -l "$apk" | grep -E "META-INF/.*\.(RSA|SF|MF)" || echo "No signature files found"
           # 使用apksigner验证
-          ${ANDROID_SDK_ROOT}/build-tools/34.0.0/apksigner verify -v "$apk" || echo "Signature verification failed"
+          echo "-- apksigner verify:"
+          ${ANDROID_SDK_ROOT}/build-tools/34.0.0/apksigner verify -v "$apk" 2>&1 || echo "apksigner verify failed"
         done
         
     - name: Show build results
       run: |
-        echo "=== BUILD LOG (last 100 lines) ==="
-        tail -100 build.log
+        echo "=== BUILD LOG (last 50 lines) ==="
+        tail -50 build.log
         echo "=== END LOG ==="
         echo "=== Looking for APK files ==="
-        find . -name "*.apk" -type f 2>/dev/null || echo "No APK files found"
-        echo "=== APK directory ==="
-        ls -la app/build/outputs/apk/debug/ 2>/dev/null || echo "Directory not found"
-      
+        find . -name "*.apk" -type f 2>/dev/null
+        
     - name: Upload build log
       uses: actions/upload-artifact@v4
       if: always()
