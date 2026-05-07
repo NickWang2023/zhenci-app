@@ -83,14 +83,30 @@ jobs:
         echo "Build exit code: $BUILD_EXIT_CODE"
         exit $BUILD_EXIT_CODE
         
-    - name: Sign Debug APK
+    - name: Generate Debug Keystore
       run: |
         echo "=== Generating debug keystore ==="
-        # 生成调试密钥库（如果还没有）
         mkdir -p ~/.android
         if [ ! -f ~/.android/debug.keystore ]; then
-          keytool -genkey -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          keytool -genkey -v \
+            -keystore ~/.android/debug.keystore \
+            -storepass android \
+            -alias androiddebugkey \
+            -keypass android \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US"
+          echo "Debug keystore created successfully"
+        else
+          echo "Debug keystore already exists"
         fi
+        ls -la ~/.android/debug.keystore
+        
+    - name: Sign Debug APK
+      run: |
+        echo "=== Checking APK files before signing ==="
+        ls -la app/build/outputs/apk/debug/
         
         echo "=== Signing APK with debug key ==="
         cd app/build/outputs/apk/debug/
@@ -98,12 +114,22 @@ jobs:
         # 找到未签名的 APK
         for apk in *.apk; do
           if [ -f "$apk" ]; then
-            echo "Signing: $apk"
+            echo "Processing: $apk"
+            # 备份原文件
+            cp "$apk" "unsigned-$apk"
             # 使用 apksigner 签名
-            ${ANDROID_SDK_ROOT}/build-tools/34.0.0/apksigner sign --ks ~/.android/debug.keystore --ks-pass pass:android --key-pass pass:android --in "$apk" --out "signed-$apk"
-            if [ -f "signed-$apk" ]; then
-              mv "signed-$apk" "$apk"
-              echo "Signed: $apk"
+            ${ANDROID_SDK_ROOT}/build-tools/34.0.0/apksigner sign \
+              --ks ~/.android/debug.keystore \
+              --ks-pass pass:android \
+              --key-pass pass:android \
+              --in "unsigned-$apk" \
+              --out "$apk"
+            if [ $? -eq 0 ]; then
+              echo "✓ Signed successfully: $apk"
+              rm -f "unsigned-$apk"
+            else
+              echo "✗ Signing failed for: $apk"
+              mv "unsigned-$apk" "$apk"
             fi
           fi
         done
@@ -119,7 +145,10 @@ jobs:
         echo "=== Checking APK signature ==="
         for apk in app/build/outputs/apk/debug/*.apk; do
           echo "Checking: $apk"
-          unzip -l "$apk" | grep -E "(META-INF|\.RSA|\.SF|\.MF)" || echo "No signature files found"
+          # 检查META-INF目录中的签名文件
+          unzip -l "$apk" | grep -E "META-INF/.*\.(RSA|SF|MF)" || echo "No signature files found"
+          # 使用apksigner验证
+          ${ANDROID_SDK_ROOT}/build-tools/34.0.0/apksigner verify -v "$apk" || echo "Signature verification failed"
         done
         
     - name: Show build results
