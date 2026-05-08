@@ -24,24 +24,38 @@ jobs:
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3
       
-    - name: Grant execute permission for gradlew
-      run: chmod +x gradlew
-
-    - name: Clean and Build Debug APK
+    - name: Check project structure
       run: |
-        ./gradlew clean assembleDebug --no-daemon --stacktrace 2>&1 | tee build.log
+        echo "=== Project structure ==="
+        ls -la
+        echo ""
+        echo "=== gradlew permissions ==="
+        ls -la gradlew
+        echo ""
+        echo "=== gradle wrapper ==="
+        ls -la gradle/wrapper/
+        cat gradle/wrapper/gradle-wrapper.properties
+
+    - name: Build Debug APK
+      run: |
+        chmod +x gradlew
+        ./gradlew --version
+        ./gradlew clean assembleDebug --no-daemon --info 2>&1 | tee build.log
         exit ${PIPESTATUS[0]}
       
     - name: Check APK output
       run: |
-        echo "=== APK Output Directory ==="
-        ls -la app/build/outputs/apk/debug/ 2>/dev/null || echo "Directory not found"
+        echo "=== Build outputs ==="
+        ls -la app/build/outputs/ 2>/dev/null || echo "outputs not found"
+        echo ""
+        echo "=== APK directory ==="
+        ls -la app/build/outputs/apk/ 2>/dev/null || echo "apk dir not found"
+        echo ""
+        echo "=== Debug directory ==="
+        ls -la app/build/outputs/apk/debug/ 2>/dev/null || echo "debug dir not found"
         echo ""
         echo "=== All APK files ==="
         find . -name "*.apk" -type f 2>/dev/null
-        echo ""
-        echo "=== Build log (last 50 lines) ==="
-        tail -50 build.log
         
     - name: Upload Debug APK
       uses: actions/upload-artifact@v4
