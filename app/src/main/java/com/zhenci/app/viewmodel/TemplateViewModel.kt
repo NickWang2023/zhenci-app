@@ -75,7 +75,10 @@ class TemplateViewModel(application: Application) : AndroidViewModel(application
             val alarmScheduler = AlarmScheduler(getApplication())
             
             // 从数据库获取模板关联的任务（通过 templateId 关联）
-            val templateTasks = taskDao.getAllTasksSync().filter { it.templateId == template.id }
+            val allTemplateTasks = taskDao.getAllTasksSync().filter { it.templateId == template.id }
+            
+            // 去重：如果模板中有重复任务，只保留一个
+            val templateTasks = allTemplateTasks.distinctBy { "${it.content}_${it.hour}_${it.minute}" }
             
             if (templateTasks.isNotEmpty()) {
                 // 如果要求清空现有任务，先删除所有非模板任务并取消它们的闹钟
@@ -89,13 +92,7 @@ class TemplateViewModel(application: Application) : AndroidViewModel(application
                     }
                 }
                 
-                // 获取当前已有的今日任务数量（用于调试）
-                val beforeCount = taskDao.getAllTasksSync().filter { it.templateId == 0L }.size
-                android.util.Log.d("TemplateViewModel", "应用模板前今日任务数: $beforeCount, 模板任务数: ${templateTasks.size}")
-                
                 // 将模板任务复制到今日任务（templateId = 0 表示是今日任务）
-                var addedCount = 0
-                var skippedCount = 0
                 templateTasks.forEach { task ->
                     // 检查是否已存在完全相同的任务（去重）
                     val existingTodayTasks = taskDao.getAllTasksSync().filter { it.templateId == 0L }
@@ -116,16 +113,8 @@ class TemplateViewModel(application: Application) : AndroidViewModel(application
                         // 为新任务设置闹钟
                         val insertedTask = newTask.copy(id = newTaskId)
                         alarmScheduler.scheduleTask(insertedTask)
-                        addedCount++
-                        android.util.Log.d("TemplateViewModel", "添加任务: ${task.content} at ${task.hour}:${task.minute}")
-                    } else {
-                        skippedCount++
-                        android.util.Log.d("TemplateViewModel", "跳过重复任务: ${task.content} at ${task.hour}:${task.minute}")
                     }
                 }
-                
-                val afterCount = taskDao.getAllTasksSync().filter { it.templateId == 0L }.size
-                android.util.Log.d("TemplateViewModel", "应用模板后今日任务数: $afterCount, 新增: $addedCount, 跳过: $skippedCount")
                 onSuccess()
             }
         }

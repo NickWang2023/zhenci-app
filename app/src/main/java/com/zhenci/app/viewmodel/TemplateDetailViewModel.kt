@@ -29,7 +29,17 @@ class TemplateDetailViewModel(
      */
     fun addTask(task: Task) {
         viewModelScope.launch {
-            taskDao.insertTask(task)
+            // 检查是否已存在相同的任务（去重）
+            val existingTasks = taskDao.getAllTasksSync().filter { it.templateId == task.templateId }
+            val isDuplicate = existingTasks.any { existing ->
+                existing.content == task.content &&
+                existing.hour == task.hour &&
+                existing.minute == task.minute
+            }
+            
+            if (!isDuplicate) {
+                taskDao.insertTask(task)
+            }
         }
     }
 
