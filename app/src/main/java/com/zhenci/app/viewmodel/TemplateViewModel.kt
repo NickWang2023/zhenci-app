@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import java.util.concurrent.atomic.AtomicBoolean
 
 class TemplateViewModel(application: Application) : AndroidViewModel(application) {
     
@@ -18,8 +19,8 @@ class TemplateViewModel(application: Application) : AndroidViewModel(application
     private val templateDao = database.templateDao()
     private val taskDao = database.taskDao()
     
-    // 防止 applyTemplate 被重复调用
-    private var isApplyingTemplate = false
+    // 防止 applyTemplate 被重复调用 - 使用 AtomicBoolean 确保线程安全
+    private val isApplyingTemplate = AtomicBoolean(false)
     
     // 模板列表
     val templates: StateFlow<List<Template>> = templateDao.getAllTemplates()
@@ -74,14 +75,13 @@ class TemplateViewModel(application: Application) : AndroidViewModel(application
     
     // 应用模板 - 将模板的任务添加到今日任务
     fun applyTemplate(template: Template, clearExisting: Boolean = false, onSuccess: () -> Unit = {}) {
-        // 防止重复调用
-        if (isApplyingTemplate) {
+        // 防止重复调用 - 使用 compareAndSet 确保只有一个线程能进入
+        if (!isApplyingTemplate.compareAndSet(false, true)) {
             android.util.Log.d("TemplateViewModel", "applyTemplate 正在执行中，跳过重复调用")
             return
         }
         
         viewModelScope.launch {
-            isApplyingTemplate = true
             try {
                 val alarmScheduler = AlarmScheduler(getApplication())
                 
@@ -134,7 +134,7 @@ class TemplateViewModel(application: Application) : AndroidViewModel(application
                     onSuccess()
                 }
             } finally {
-                isApplyingTemplate = false
+                isApplyingTemplate.set(false)
             }
         }
     }

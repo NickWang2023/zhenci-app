@@ -136,8 +136,13 @@ fun TemplatesScreen(
                             Toast.makeText(context, "模板已复制到剪贴板", Toast.LENGTH_SHORT).show()
                         },
                         onApply = { 
-                            applyingTemplate = template
-                            showApplyConfirm = true
+                            android.util.Log.d("TemplatesScreen", "onApply called for template: ${template.name}, id: ${template.id}")
+                            if (applyingTemplate == null) {
+                                applyingTemplate = template
+                                showApplyConfirm = true
+                            } else {
+                                android.util.Log.d("TemplatesScreen", "onApply ignored - already applying template")
+                            }
                         },
                         onSetDefault = {
                             viewModel.setDefaultTemplate(template.id)
@@ -243,6 +248,7 @@ fun TemplatesScreen(
                 applyingTemplate = null
             },
             onConfirm = { clearExisting ->
+                android.util.Log.d("TemplatesScreen", "ApplyTemplateDialog onConfirm called, clearExisting: $clearExisting")
                 applyingTemplate?.let { template ->
                     viewModel.applyTemplate(template, clearExisting) {
                         val message = if (clearExisting) {
