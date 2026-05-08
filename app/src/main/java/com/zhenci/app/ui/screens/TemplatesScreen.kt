@@ -241,13 +241,18 @@ fun TemplatesScreen(
 
     // 应用模板确认对话框
     if (showApplyConfirm && applyingTemplate != null) {
+        var isProcessing by remember { mutableStateOf(false) }
         ApplyTemplateDialog(
             templateName = applyingTemplate!!.name,
             onDismiss = {
-                showApplyConfirm = false
-                applyingTemplate = null
+                if (!isProcessing) {
+                    showApplyConfirm = false
+                    applyingTemplate = null
+                }
             },
             onConfirm = { clearExisting ->
+                if (isProcessing) return@ApplyTemplateDialog
+                isProcessing = true
                 android.util.Log.d("TemplatesScreen", "ApplyTemplateDialog onConfirm called, clearExisting: $clearExisting")
                 applyingTemplate?.let { template ->
                     viewModel.applyTemplate(template, clearExisting) {
@@ -257,10 +262,15 @@ fun TemplatesScreen(
                             "模板已应用到今日任务"
                         }
                         Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                        showApplyConfirm = false
+                        applyingTemplate = null
+                        isProcessing = false
                     }
+                } ?: run {
+                    showApplyConfirm = false
+                    applyingTemplate = null
+                    isProcessing = false
                 }
-                showApplyConfirm = false
-                applyingTemplate = null
             }
         )
     }

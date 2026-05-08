@@ -41,7 +41,10 @@ class ReminderActivity : ComponentActivity() {
         val taskHour = intent.getIntExtra("task_hour", 0)
         val taskMinute = intent.getIntExtra("task_minute", 0)
 
+        android.util.Log.d("ReminderActivity", "onCreate: taskId=$taskId, content=$taskContent, time=$taskHour:$taskMinute")
+
         if (taskId == -1L) {
+            android.util.Log.e("ReminderActivity", "Invalid taskId, finishing")
             finish()
             return
         }
@@ -79,6 +82,7 @@ class ReminderActivity : ComponentActivity() {
                         taskTime = timeString,
                         onExecute = {
                             // 执行任务：+1分，标记完成
+                            android.util.Log.d("ReminderActivity", "onExecute clicked for taskId=$taskId")
                             viewModel.executeTask(taskId)
                             showDialog = false
                             finish()
