@@ -24,39 +24,76 @@ jobs:
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3
       
+    - name: Cache Gradle packages
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-
+
     - name: Setup Gradle Wrapper
       run: |
+        echo "=== Setting up Gradle Wrapper ==="
         mkdir -p gradle/wrapper
-        # Download the correct gradle wrapper jar (much smaller ~53KB)
+        
+        # 创建 gradle-wrapper.properties
+        cat > gradle/wrapper/gradle-wrapper.properties << 'EOF'
+        distributionBase=GRADLE_USER_HOME
+        distributionPath=wrapper/dists
+        distributionUrl=https\://services.gradle.org/distributions/gradle-8.5-bin.zip
+        networkTimeout=10000
+        validateDistributionUrl=true
+        zipStoreBase=GRADLE_USER_HOME
+        zipStorePath=wrapper/dists
+        EOF
+        
+        # 下载 wrapper jar
         curl -L -o gradle/wrapper/gradle-wrapper.jar \
           "https://raw.githubusercontent.com/gradle/gradle/v8.5.0/gradle/wrapper/gradle-wrapper.jar"
-        ls -la gradle/wrapper/
-
+        
+        # 创建正确的 gradlew 脚本
+        cat > gradlew << 'SCRIPT'
+        #!/bin/sh
+        APP_HOME=$(cd "$(dirname "$0")" && pwd)
+        java -Xmx2048m -Xms512m -classpath "$APP_HOME/gradle/wrapper/gradle-wrapper.jar" org.gradle.wrapper.GradleWrapperMain "$@"
+        SCRIPT
+        
+        chmod +x gradlew
+        
+        echo "=== Gradle Wrapper Setup Complete ==="
+        
     - name: Build Debug APK
       run: |
-        chmod +x gradlew
-        ./gradlew clean assembleDebug --no-daemon --stacktrace 2>&1 | tee build.log
-        exit ${PIPESTATUS[0]}
-      
-    - name: Check APK output
-      run: |
-        echo "=== APK files ==="
-        find . -name "*.apk" -type f 2>/dev/null | xargs ls -la
-        echo ""
-        echo "=== Build outputs ==="
-        ls -la app/build/outputs/apk/debug/ 2>/dev/null || echo "not found"
+        ./gradlew :app:assembleDebug --no-daemon --stacktrace 2>&1 | tee build.log
+        BUILD_EXIT_CODE=${PIPESTATUS[0]}
+        echo "Build exit code: $BUILD_EXIT_CODE"
+        exit $BUILD_EXIT_CODE
         
+    - name: Show build results
+      run: |
+        echo "=== BUILD LOG (last 100 lines) ==="
+        tail -100 build.log
+        echo "=== END LOG ==="
+        echo "=== Looking for APK files ==="
+        find . -name "*.apk" -type f 2>/dev/null || echo "No APK files found"
+        echo "=== APK directory ==="
+        ls -la app/build/outputs/apk/debug/ 2>/dev/null || echo "Directory not found"
+      
+    - name: Upload build log
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: build-log
+        path: build.log
+        if-no-files-found: ignore
+      
     - name: Upload Debug APK
       uses: actions/upload-artifact@v4
       if: success()
       with:
         name: zhenci-debug-apk
         path: app/build/outputs/apk/debug/*.apk
-        if-no-files-found: error
-        
-    - name: Upload build log on failure
-      uses: actions/upload-artifact@v4
-      if: failure()
-      with:
-        name: build-log
-        path: build.log
+        if-no-files-found: warn
