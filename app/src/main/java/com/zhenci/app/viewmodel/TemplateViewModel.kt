@@ -89,18 +89,30 @@ class TemplateViewModel(application: Application) : AndroidViewModel(application
                     }
                 }
                 
+                // 获取现有今日任务，用于去重检查
+                val existingTodayTasks = taskDao.getAllTasksSync().filter { it.templateId == 0L }
+                
                 // 将模板任务复制到今日任务（templateId = 0 表示是今日任务）
                 templateTasks.forEach { task ->
-                    val newTask = task.copy(
-                        id = 0, // 新任务，让数据库自动生成ID
-                        templateId = 0, // 0 表示这是今日任务，不是模板任务
-                        isCompleted = false,
-                        isEnabled = true
-                    )
-                    val newTaskId = taskDao.insertTask(newTask)
-                    // 为新任务设置闹钟
-                    val insertedTask = newTask.copy(id = newTaskId)
-                    alarmScheduler.scheduleTask(insertedTask)
+                    // 检查是否已存在相同内容的任务（去重）
+                    val isDuplicate = existingTodayTasks.any { existing ->
+                        existing.content == task.content && 
+                        existing.hour == task.hour && 
+                        existing.minute == task.minute
+                    }
+                    
+                    if (!isDuplicate) {
+                        val newTask = task.copy(
+                            id = 0, // 新任务，让数据库自动生成ID
+                            templateId = 0, // 0 表示这是今日任务，不是模板任务
+                            isCompleted = false,
+                            isEnabled = true
+                        )
+                        val newTaskId = taskDao.insertTask(newTask)
+                        // 为新任务设置闹钟
+                        val insertedTask = newTask.copy(id = newTaskId)
+                        alarmScheduler.scheduleTask(insertedTask)
+                    }
                 }
                 onSuccess()
             }
