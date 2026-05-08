@@ -133,10 +133,12 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
     
-    // 关闭任务（不加分）
+    // 关闭任务（不加分，任务保持原样，只记录关闭次数）
     fun closeTask(taskId: Long) {
         viewModelScope.launch {
+            // 只增加关闭计数，不修改任务完成状态
             userStatsDao.incrementClosed()
+            // 任务保持原样（isCompleted = false）
         }
     }
     

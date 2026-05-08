@@ -18,6 +18,9 @@ class TemplateViewModel(application: Application) : AndroidViewModel(application
     private val templateDao = database.templateDao()
     private val taskDao = database.taskDao()
     
+    // 防止 applyTemplate 被重复调用
+    private var isApplyingTemplate = false
+    
     // 模板列表
     val templates: StateFlow<List<Template>> = templateDao.getAllTemplates()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -71,51 +74,67 @@ class TemplateViewModel(application: Application) : AndroidViewModel(application
     
     // 应用模板 - 将模板的任务添加到今日任务
     fun applyTemplate(template: Template, clearExisting: Boolean = false, onSuccess: () -> Unit = {}) {
+        // 防止重复调用
+        if (isApplyingTemplate) {
+            android.util.Log.d("TemplateViewModel", "applyTemplate 正在执行中，跳过重复调用")
+            return
+        }
+        
         viewModelScope.launch {
-            val alarmScheduler = AlarmScheduler(getApplication())
-            
-            // 从数据库获取模板关联的任务（通过 templateId 关联）
-            val allTemplateTasks = taskDao.getAllTasksSync().filter { it.templateId == template.id }
-            
-            // 去重：如果模板中有重复任务，只保留一个
-            val templateTasks = allTemplateTasks.distinctBy { "${it.content}_${it.hour}_${it.minute}" }
-            
-            if (templateTasks.isNotEmpty()) {
-                // 如果要求清空现有任务，先删除所有非模板任务并取消它们的闹钟
-                if (clearExisting) {
-                    val existingTasks = taskDao.getAllTasksSync().filter { it.templateId == 0L }
-                    existingTasks.forEach { task ->
-                        // 取消旧任务的闹钟
-                        alarmScheduler.cancelTask(task.id)
-                        // 从数据库删除任务
-                        taskDao.deleteTask(task)
-                    }
-                }
+            isApplyingTemplate = true
+            try {
+                val alarmScheduler = AlarmScheduler(getApplication())
                 
-                // 将模板任务复制到今日任务（templateId = 0 表示是今日任务）
-                templateTasks.forEach { task ->
-                    // 检查是否已存在完全相同的任务（去重）
-                    val existingTodayTasks = taskDao.getAllTasksSync().filter { it.templateId == 0L }
-                    val isDuplicate = existingTodayTasks.any { existing ->
-                        existing.content == task.content && 
-                        existing.hour == task.hour && 
-                        existing.minute == task.minute
+                // 从数据库获取模板关联的任务（通过 templateId 关联）
+                val allTemplateTasks = taskDao.getAllTasksSync().filter { it.templateId == template.id }
+                
+                // 去重：如果模板中有重复任务，只保留一个
+                val templateTasks = allTemplateTasks.distinctBy { "${it.content}_${it.hour}_${it.minute}" }
+                
+                android.util.Log.d("TemplateViewModel", "应用模板: ${template.name}, 模板任务数: ${templateTasks.size}")
+                
+                if (templateTasks.isNotEmpty()) {
+                    // 如果要求清空现有任务，先删除所有非模板任务并取消它们的闹钟
+                    if (clearExisting) {
+                        val existingTasks = taskDao.getAllTasksSync().filter { it.templateId == 0L }
+                        existingTasks.forEach { task ->
+                            // 取消旧任务的闹钟
+                            alarmScheduler.cancelTask(task.id)
+                            // 从数据库删除任务
+                            taskDao.deleteTask(task)
+                        }
                     }
                     
-                    if (!isDuplicate) {
-                        val newTask = task.copy(
-                            id = 0, // 新任务，让数据库自动生成ID
-                            templateId = 0, // 0 表示这是今日任务，不是模板任务
-                            isCompleted = false,
-                            isEnabled = true
-                        )
-                        val newTaskId = taskDao.insertTask(newTask)
-                        // 为新任务设置闹钟
-                        val insertedTask = newTask.copy(id = newTaskId)
-                        alarmScheduler.scheduleTask(insertedTask)
+                    // 将模板任务复制到今日任务（templateId = 0 表示是今日任务）
+                    templateTasks.forEach { task ->
+                        // 检查是否已存在完全相同的任务（去重）
+                        val existingTodayTasks = taskDao.getAllTasksSync().filter { it.templateId == 0L }
+                        val isDuplicate = existingTodayTasks.any { existing ->
+                            existing.content == task.content && 
+                            existing.hour == task.hour && 
+                            existing.minute == task.minute
+                        }
+                        
+                        if (!isDuplicate) {
+                            val newTask = task.copy(
+                                id = 0, // 新任务，让数据库自动生成ID
+                                templateId = 0, // 0 表示这是今日任务，不是模板任务
+                                isCompleted = false,
+                                isEnabled = true
+                            )
+                            val newTaskId = taskDao.insertTask(newTask)
+                            // 为新任务设置闹钟
+                            val insertedTask = newTask.copy(id = newTaskId)
+                            alarmScheduler.scheduleTask(insertedTask)
+                            android.util.Log.d("TemplateViewModel", "添加任务: ${task.content}")
+                        } else {
+                            android.util.Log.d("TemplateViewModel", "跳过重复任务: ${task.content}")
+                        }
                     }
+                    onSuccess()
                 }
-                onSuccess()
+            } finally {
+                isApplyingTemplate = false
             }
         }
     }
