@@ -24,38 +24,27 @@ jobs:
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3
       
-    - name: Check project structure
+    - name: Setup Gradle Wrapper
       run: |
-        echo "=== Project structure ==="
-        ls -la
-        echo ""
-        echo "=== gradlew permissions ==="
-        ls -la gradlew
-        echo ""
-        echo "=== gradle wrapper ==="
+        mkdir -p gradle/wrapper
+        # Download the correct gradle wrapper jar (much smaller ~53KB)
+        curl -L -o gradle/wrapper/gradle-wrapper.jar \
+          "https://raw.githubusercontent.com/gradle/gradle/v8.5.0/gradle/wrapper/gradle-wrapper.jar"
         ls -la gradle/wrapper/
-        cat gradle/wrapper/gradle-wrapper.properties
 
     - name: Build Debug APK
       run: |
         chmod +x gradlew
-        ./gradlew --version
-        ./gradlew clean assembleDebug --no-daemon --info 2>&1 | tee build.log
+        ./gradlew clean assembleDebug --no-daemon --stacktrace 2>&1 | tee build.log
         exit ${PIPESTATUS[0]}
       
     - name: Check APK output
       run: |
+        echo "=== APK files ==="
+        find . -name "*.apk" -type f 2>/dev/null | xargs ls -la
+        echo ""
         echo "=== Build outputs ==="
-        ls -la app/build/outputs/ 2>/dev/null || echo "outputs not found"
-        echo ""
-        echo "=== APK directory ==="
-        ls -la app/build/outputs/apk/ 2>/dev/null || echo "apk dir not found"
-        echo ""
-        echo "=== Debug directory ==="
-        ls -la app/build/outputs/apk/debug/ 2>/dev/null || echo "debug dir not found"
-        echo ""
-        echo "=== All APK files ==="
-        find . -name "*.apk" -type f 2>/dev/null
+        ls -la app/build/outputs/apk/debug/ 2>/dev/null || echo "not found"
         
     - name: Upload Debug APK
       uses: actions/upload-artifact@v4
