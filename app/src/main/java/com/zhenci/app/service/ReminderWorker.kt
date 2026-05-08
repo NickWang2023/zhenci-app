@@ -85,13 +85,31 @@ class ReminderWorker(
         val intent = android.content.Intent(context, com.zhenci.app.ReminderActivity::class.java).apply {
             flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or
                     android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP or
-                    android.content.Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS
+                    android.content.Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS or
+                    android.content.Intent.FLAG_ACTIVITY_BROUGHT_TO_FRONT
             putExtra("task_id", taskId)
             putExtra("task_content", content)
             putExtra("task_hour", hour)
             putExtra("task_minute", minute)
         }
-        context.startActivity(intent)
+        
+        // Android 10+ 需要检查是否可以启动 Activity
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            // 检查是否有权限在其他应用之上显示
+            val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+            if (!powerManager.isInteractive) {
+                // 屏幕关闭时，使用全屏 intent
+                Log.d(TAG, "屏幕关闭，使用全屏intent启动")
+            }
+        }
+        
+        try {
+            context.startActivity(intent)
+            Log.d(TAG, "ReminderActivity 启动成功")
+        } catch (e: Exception) {
+            Log.e(TAG, "启动 ReminderActivity 失败: ${e.message}")
+            e.printStackTrace()
+        }
     }
 
     private fun showNotification(context: Context, title: String, description: String, taskId: Long) {

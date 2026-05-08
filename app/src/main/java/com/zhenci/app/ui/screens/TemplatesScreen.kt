@@ -501,10 +501,17 @@ fun ApplyTemplateDialog(
             }
         },
         confirmButton = {
+            var isConfirming by remember { mutableStateOf(false) }
             Button(
-                onClick = { onConfirm(clearExisting) }
+                onClick = { 
+                    if (!isConfirming) {
+                        isConfirming = true
+                        onConfirm(clearExisting)
+                    }
+                },
+                enabled = !isConfirming
             ) {
-                Text("应用")
+                Text(if (isConfirming) "应用中..." else "应用")
             }
         },
         dismissButton = {
