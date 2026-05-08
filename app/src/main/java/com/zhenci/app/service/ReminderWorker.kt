@@ -85,31 +85,67 @@ class ReminderWorker(
         val intent = android.content.Intent(context, com.zhenci.app.ReminderActivity::class.java).apply {
             flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or
                     android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP or
-                    android.content.Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS or
-                    android.content.Intent.FLAG_ACTIVITY_BROUGHT_TO_FRONT
+                    android.content.Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS
             putExtra("task_id", taskId)
             putExtra("task_content", content)
             putExtra("task_hour", hour)
             putExtra("task_minute", minute)
         }
         
-        // Android 10+ 需要检查是否可以启动 Activity
+        // Android 10+ 从后台启动 Activity 有限制，需要使用全屏通知
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-            // 检查是否有权限在其他应用之上显示
-            val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
-            if (!powerManager.isInteractive) {
-                // 屏幕关闭时，使用全屏 intent
-                Log.d(TAG, "屏幕关闭，使用全屏intent启动")
+            Log.d(TAG, "Android 10+，使用全屏通知启动")
+            // 显示全屏通知来启动 Activity
+            showFullscreenNotification(context, taskId, content, hour, minute)
+        } else {
+            try {
+                context.startActivity(intent)
+                Log.d(TAG, "ReminderActivity 启动成功")
+            } catch (e: Exception) {
+                Log.e(TAG, "启动 ReminderActivity 失败: ${e.message}")
+                e.printStackTrace()
+                // 失败后使用全屏通知
+                showFullscreenNotification(context, taskId, content, hour, minute)
             }
         }
+    }
+    
+    /**
+     * 显示全屏通知来启动 ReminderActivity
+     */
+    private fun showFullscreenNotification(context: Context, taskId: Long, content: String, hour: Int, minute: Int) {
+        val notificationId = taskId.toInt()
         
-        try {
-            context.startActivity(intent)
-            Log.d(TAG, "ReminderActivity 启动成功")
-        } catch (e: Exception) {
-            Log.e(TAG, "启动 ReminderActivity 失败: ${e.message}")
-            e.printStackTrace()
+        // 创建启动 ReminderActivity 的 Intent
+        val fullScreenIntent = android.content.Intent(context, com.zhenci.app.ReminderActivity::class.java).apply {
+            flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or
+                    android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra("task_id", taskId)
+            putExtra("task_content", content)
+            putExtra("task_hour", hour)
+            putExtra("task_minute", minute)
         }
+        
+        val fullScreenPendingIntent = PendingIntent.getActivity(
+            context, notificationId, fullScreenIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notification = NotificationCompat.Builder(context, ZhenciApplication.CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle("针刺提醒")
+            .setContentText(content)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setAutoCancel(true)
+            .setFullScreenIntent(fullScreenPendingIntent, true)
+            .setVibrate(longArrayOf(0, 1000, 500, 1000))
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .build()
+
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager.notify(notificationId, notification)
+        Log.d(TAG, "全屏通知已显示")
     }
 
     private fun showNotification(context: Context, title: String, description: String, taskId: Long) {
