@@ -34,6 +34,26 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-gradle-
 
+    - name: Generate Debug Keystore
+      run: |
+        echo "=== Generating debug keystore ==="
+        mkdir -p ~/.android
+        if [ ! -f ~/.android/debug.keystore ]; then
+          keytool -genkey -v \
+            -keystore ~/.android/debug.keystore \
+            -storepass android \
+            -alias androiddebugkey \
+            -keypass android \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US"
+          echo "✓ Debug keystore created"
+        else
+          echo "✓ Debug keystore already exists"
+        fi
+        ls -la ~/.android/debug.keystore
+        
     - name: Setup Gradle Wrapper
       run: |
         echo "=== Setting up Gradle Wrapper ==="
@@ -62,9 +82,8 @@ jobs:
         SCRIPT
         
         chmod +x gradlew
-        
         echo "=== Gradle Wrapper Setup Complete ==="
-        
+
     - name: Build Debug APK
       run: |
         ./gradlew :app:assembleDebug --no-daemon --stacktrace 2>&1 | tee build.log
@@ -72,44 +91,26 @@ jobs:
         echo "Build exit code: $BUILD_EXIT_CODE"
         exit $BUILD_EXIT_CODE
         
-    - name: Sign Debug APK
-      run: |
-        echo "=== Generating debug keystore ==="
-        keytool -genkey -v \
-          -keystore ~/.android/debug.keystore \
-          -storepass android \
-          -alias androiddebugkey \
-          -keypass android \
-          -keyalg RSA \
-          -keysize 2048 \
-          -validity 10000 \
-          -dname "CN=Android Debug,O=Android,C=US"
-        
-        echo "=== Signing APK ==="
-        cd app/build/outputs/apk/debug/
-        for apk in *.apk; do
-          if [ -f "$apk" ]; then
-            echo "Signing: $apk"
-            zip -d "$apk" "META-INF/*.SF" "META-INF/*.RSA" "META-INF/*.MF" 2>/dev/null || true
-            jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 \
-              -keystore ~/.android/debug.keystore \
-              -storepass android \
-              -keypass android \
-              "$apk" androiddebugkey
-          fi
-        done
-        cd -
-        
     - name: Verify APK
       run: |
         echo "=== APK files ==="
-        find . -name "*.apk" -type f 2>/dev/null | xargs ls -la
+        ls -la app/build/outputs/apk/debug/
         
-    - name: Show build log on failure
-      if: failure()
+        echo "=== Checking APK signature ==="
+        for apk in app/build/outputs/apk/debug/*.apk; do
+          echo "Checking: $apk"
+          # 检查META-INF目录中的签名文件
+          echo "-- Signature files:"
+          unzip -l "$apk" | grep -E "META-INF/.*\.(RSA|SF|MF)" || echo "No signature files found"
+        done
+        
+    - name: Show build results
       run: |
-        echo "=== BUILD LOG (last 100 lines) ==="
-        tail -100 build.log
+        echo "=== BUILD LOG (last 50 lines) ==="
+        tail -50 build.log
+        echo "=== END LOG ==="
+        echo "=== Looking for APK files ==="
+        find . -name "*.apk" -type f 2>/dev/null
         
     - name: Upload build log
       uses: actions/upload-artifact@v4
