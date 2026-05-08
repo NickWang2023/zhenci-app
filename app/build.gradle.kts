@@ -6,14 +6,14 @@ plugins {
 
 android {
     namespace = "com.zhenci.app"
-    compileSdk = 33
+    compileSdk = 34
 
     defaultConfig {
         applicationId = "com.zhenci.app"
-        minSdk = 21
-        targetSdk = 33
-        versionCode = 3
-        versionName = "1.0.2"
+        minSdk = 26
+        targetSdk = 34
+        versionCode = 4
+        versionName = "1.0.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
