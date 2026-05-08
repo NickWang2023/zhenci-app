@@ -71,7 +71,6 @@ jobs:
         BUILD_EXIT_CODE=${PIPESTATUS[0]}
         echo "Build exit code: $BUILD_EXIT_CODE"
         exit $BUILD_EXIT_CODE
-      continue-on-error: true
         
     - name: Show build results
       run: |
@@ -93,8 +92,8 @@ jobs:
       
     - name: Upload Debug APK
       uses: actions/upload-artifact@v4
-      if: always()
+      if: success()
       with:
         name: zhenci-debug-apk
         path: app/build/outputs/apk/debug/*.apk
-        if-no-files-found: ignore
+        if-no-files-found: warn
