@@ -120,16 +120,20 @@ class TemplateViewModel(application: Application) : AndroidViewModel(application
                     // 将模板任务复制到今日任务（templateId = 0 表示是今日任务）
                     var addedCount = 0
                     var skippedCount = 0
+                    val processedTasks = mutableSetOf<String>()
                     
                     templateTasks.forEach { task ->
+                        val taskKey = "${task.content}_${task.hour}_${task.minute}"
+                        
                         // 检查是否已存在完全相同的任务（去重）
                         val isDuplicate = existingTodayTasks.any { existing ->
                             existing.content == task.content && 
                             existing.hour == task.hour && 
                             existing.minute == task.minute
-                        }
+                        } || processedTasks.contains(taskKey)
                         
                         if (!isDuplicate) {
+                            processedTasks.add(taskKey)
                             val newTask = task.copy(
                                 id = 0, // 新任务，让数据库自动生成ID
                                 templateId = 0, // 0 表示这是今日任务，不是模板任务
