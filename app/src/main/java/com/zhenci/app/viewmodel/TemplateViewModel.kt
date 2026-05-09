@@ -95,7 +95,7 @@ class TemplateViewModel(application: Application) : AndroidViewModel(application
                     android.util.Log.d("TemplateViewModel", "  - 任务: ${it.content} at ${it.hour}:${it.minute}, id: ${it.id}")
                 }
                 
-                // 去重：如果模板中有重复任务，只保留一个
+                // 去重：如果模板中有重复任务，只保留一个（基于内容+时间）
                 val templateTasks = allTemplateTasks.distinctBy { "${it.content}_${it.hour}_${it.minute}" }
                 
                 android.util.Log.d("TemplateViewModel", "模板 ${template.name} 去重后任务数: ${templateTasks.size}")
@@ -113,7 +113,7 @@ class TemplateViewModel(application: Application) : AndroidViewModel(application
                         android.util.Log.d("TemplateViewModel", "已清空 ${existingTasks.size} 个现有任务")
                     }
                     
-                    // 获取当前已有的今日任务（用于去重检查）
+                    // 获取当前已有的今日任务（用于去重检查）- 在清空后重新获取
                     val existingTodayTasks = taskDao.getAllTasksSync().filter { it.templateId == 0L }
                     android.util.Log.d("TemplateViewModel", "当前今日任务数: ${existingTodayTasks.size}")
                     

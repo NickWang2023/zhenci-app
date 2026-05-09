@@ -309,6 +309,7 @@ fun TemplateTaskDialog(
     var selectedType by remember { mutableStateOf(task?.type ?: TaskType.WORK) }
     var selectedHour by remember { mutableStateOf(task?.hour ?: 9) }
     var selectedMinute by remember { mutableStateOf(task?.minute ?: 0) }
+    var isSubmitting by remember { mutableStateOf(false) }
 
     val timePickerDialog = TimePickerDialog(
         context,
@@ -388,6 +389,8 @@ fun TemplateTaskDialog(
         confirmButton = {
             TextButton(
                 onClick = {
+                    if (isSubmitting) return@TextButton
+                    isSubmitting = true
                     val newTask = Task(
                         id = task?.id ?: 0,
                         content = taskContent,
@@ -400,9 +403,9 @@ fun TemplateTaskDialog(
                     )
                     onConfirm(newTask)
                 },
-                enabled = taskContent.isNotBlank()
+                enabled = taskContent.isNotBlank() && !isSubmitting
             ) {
-                Text("保存")
+                Text(if (isSubmitting) "保存中..." else "保存")
             }
         },
         dismissButton = {

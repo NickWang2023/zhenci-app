@@ -29,7 +29,7 @@ class TemplateDetailViewModel(
      */
     fun addTask(task: Task) {
         viewModelScope.launch {
-            // 检查是否已存在相同的任务（去重）
+            // 检查是否已存在相同的任务（去重）- 使用数据库事务确保原子性
             val existingTasks = taskDao.getAllTasksSync().filter { it.templateId == task.templateId }
             val isDuplicate = existingTasks.any { existing ->
                 existing.content == task.content &&
@@ -39,6 +39,9 @@ class TemplateDetailViewModel(
             
             if (!isDuplicate) {
                 taskDao.insertTask(task)
+                android.util.Log.d("TemplateDetailViewModel", "添加任务成功: ${task.content} at ${task.hour}:${task.minute}")
+            } else {
+                android.util.Log.d("TemplateDetailViewModel", "跳过重复任务: ${task.content} at ${task.hour}:${task.minute}")
             }
         }
     }

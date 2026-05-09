@@ -85,28 +85,23 @@ class ReminderWorker(
         val intent = android.content.Intent(context, com.zhenci.app.ReminderActivity::class.java).apply {
             flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or
                     android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP or
-                    android.content.Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS
+                    android.content.Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS or
+                    android.content.Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
             putExtra("task_id", taskId)
             putExtra("task_content", content)
             putExtra("task_hour", hour)
             putExtra("task_minute", minute)
         }
         
-        // Android 10+ 从后台启动 Activity 有限制，需要使用全屏通知
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-            Log.d(TAG, "Android 10+，使用全屏通知启动")
-            // 显示全屏通知来启动 Activity
+        // 尝试直接启动 Activity
+        try {
+            context.startActivity(intent)
+            Log.d(TAG, "ReminderActivity 启动成功")
+        } catch (e: Exception) {
+            Log.e(TAG, "启动 ReminderActivity 失败: ${e.message}")
+            e.printStackTrace()
+            // 失败后使用全屏通知作为备用方案
             showFullscreenNotification(context, taskId, content, hour, minute)
-        } else {
-            try {
-                context.startActivity(intent)
-                Log.d(TAG, "ReminderActivity 启动成功")
-            } catch (e: Exception) {
-                Log.e(TAG, "启动 ReminderActivity 失败: ${e.message}")
-                e.printStackTrace()
-                // 失败后使用全屏通知
-                showFullscreenNotification(context, taskId, content, hour, minute)
-            }
         }
     }
     
@@ -350,15 +345,13 @@ class ReminderWorker(
     private fun rescheduleForTomorrow(taskId: Long, content: String) {
         try {
             val scheduler = AlarmScheduler(applicationContext)
-            // 从 content 解析时间 (格式: "HH:MM 内容")
-            val timePart = content.substringBefore(" ")
-            val taskContent = content.substringAfter(" ", "针刺提醒")
-            val hour = timePart.substringBefore(":").toIntOrNull() ?: 9
-            val minute = timePart.substringAfter(":").toIntOrNull() ?: 0
+            // 直接使用传入的 taskId 和 content，以及 hour/minute
+            val hour = inputData.getInt("task_hour", 9)
+            val minute = inputData.getInt("task_minute", 0)
 
             val task = com.zhenci.app.data.entity.Task(
                 id = taskId,
-                content = taskContent,
+                content = content,
                 hour = hour,
                 minute = minute,
                 isEnabled = true
