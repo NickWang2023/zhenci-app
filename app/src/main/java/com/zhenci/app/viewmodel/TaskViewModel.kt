@@ -19,8 +19,8 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
     private val taskDao = database.taskDao()
     private val userStatsDao = database.userStatsDao()
     
-    // 任务列表
-    val tasks: StateFlow<List<Task>> = taskDao.getAllTasks()
+    // 任务列表 - 只获取今日任务（templateId = 0），排除模板任务
+    val tasks: StateFlow<List<Task>> = taskDao.getTodayTasks()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     
     // 用户统计

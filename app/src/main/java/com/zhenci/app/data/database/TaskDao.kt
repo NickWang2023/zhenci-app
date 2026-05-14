@@ -9,16 +9,19 @@ interface TaskDao {
     @Query("SELECT * FROM tasks ORDER BY hour, minute")
     fun getAllTasks(): Flow<List<Task>>
 
+    @Query("SELECT * FROM tasks WHERE templateId = 0 ORDER BY hour, minute")
+    fun getTodayTasks(): Flow<List<Task>>
+
     @Query("SELECT * FROM tasks ORDER BY hour, minute")
     suspend fun getAllTasksSync(): List<Task>
 
     @Query("SELECT * FROM tasks WHERE templateId = :templateId ORDER BY hour, minute")
     fun getTasksByTemplate(templateId: Long): Flow<List<Task>>
 
-    @Query("SELECT * FROM tasks WHERE isEnabled = 1 ORDER BY hour, minute")
+    @Query("SELECT * FROM tasks WHERE isEnabled = 1 AND templateId = 0 ORDER BY hour, minute")
     fun getEnabledTasks(): Flow<List<Task>>
 
-    @Query("SELECT * FROM tasks WHERE isCompleted = 0 ORDER BY hour, minute")
+    @Query("SELECT * FROM tasks WHERE isCompleted = 0 AND templateId = 0 ORDER BY hour, minute")
     fun getIncompleteTasks(): Flow<List<Task>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
