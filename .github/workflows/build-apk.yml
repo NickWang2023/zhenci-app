@@ -72,6 +72,26 @@ jobs:
         echo "Build exit code: $BUILD_EXIT_CODE"
         exit $BUILD_EXIT_CODE
         
+    - name: Verify APK Signature
+      run: |
+        echo "=== APK Output Directory ==="
+        ls -la app/build/outputs/apk/debug/ 2>/dev/null || echo "Directory not found"
+        echo ""
+        
+        echo "=== Checking APK Signature ==="
+        for apk in app/build/outputs/apk/debug/*.apk; do
+          if [ -f "$apk" ]; then
+            echo "Checking: $apk"
+            echo "-- APK Info:"
+            ls -lh "$apk"
+            echo "-- Signature files in META-INF:"
+            unzip -l "$apk" | grep -E "META-INF/.*\.(RSA|DSA|EC|SF|MF)" || echo "WARNING: No signature files found!"
+            echo "-- Verifying APK signature with apksigner:"
+            $ANDROID_SDK_ROOT/build-tools/34.0.0/apksigner verify --verbose "$apk" 2>&1 || echo "WARNING: apksigner verification failed"
+            echo ""
+          fi
+        done
+        
     - name: Show build results
       run: |
         echo "=== BUILD LOG (last 100 lines) ==="
@@ -96,4 +116,4 @@ jobs:
       with:
         name: zhenci-debug-apk
         path: app/build/outputs/apk/debug/*.apk
-        if-no-files-found: warn
+        if-no-files-found: error
