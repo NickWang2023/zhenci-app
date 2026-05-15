@@ -67,13 +67,6 @@
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
 
-        <!-- Reminder Foreground Service -->
-        <service
-            android:name=".service.ReminderForegroundService"
-            android:enabled="true"
-            android:exported="false"
-            android:foregroundServiceType="mediaPlayback" />
-
     </application>
 
 </manifest>
