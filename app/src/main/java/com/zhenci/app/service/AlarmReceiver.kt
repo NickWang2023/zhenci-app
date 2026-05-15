@@ -3,7 +3,12 @@ package com.zhenci.app.service
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.util.Log
+import androidx.work.Data
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
 
 class AlarmReceiver : BroadcastReceiver() {
 
@@ -18,9 +23,39 @@ class AlarmReceiver : BroadcastReceiver() {
         val minute = intent.getIntExtra("task_minute", 0)
         Log.d(TAG, "onReceive: 收到闹钟广播 taskId=$taskId, content=$content, time=$hour:$minute")
         
-        // 使用前台服务显示提醒弹窗和语音播报
-        // Android 10+ 限制后台启动 Activity，前台服务可以绕过此限制
-        ReminderForegroundService.start(context, taskId, content, hour, minute)
+        // 启动前台服务来显示弹窗（Android 10+ 需要前台服务才能启动 Activity）
+        val serviceIntent = Intent(context, ReminderForegroundService::class.java).apply {
+            putExtra("task_id", taskId)
+            putExtra("task_content", content)
+            putExtra("task_hour", hour)
+            putExtra("task_minute", minute)
+        }
+        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            context.startForegroundService(serviceIntent)
+        } else {
+            context.startService(serviceIntent)
+        }
         Log.d(TAG, "onReceive: 前台服务已启动")
+        
+        // 同时通过 WorkManager 执行提醒任务（作为备用）
+        val inputData = Data.Builder()
+            .putLong("task_id", taskId)
+            .putString("task_content", content)
+            .putInt("task_hour", hour)
+            .putInt("task_minute", minute)
+            .build()
+
+        val workRequest = OneTimeWorkRequestBuilder<ReminderWorker>()
+            .setInputData(inputData)
+            .addTag("alarm_task_$taskId")
+            .build()
+
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            "alarm_task_$taskId",
+            ExistingWorkPolicy.REPLACE,
+            workRequest
+        )
+        Log.d(TAG, "onReceive: WorkManager 任务已提交")
     }
 }

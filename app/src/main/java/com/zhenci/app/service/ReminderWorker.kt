@@ -82,10 +82,10 @@ class ReminderWorker(
      * 启动 ReminderActivity 显示提醒弹窗
      */
     private fun startReminderActivity(context: Context, taskId: Long, content: String, hour: Int, minute: Int) {
-        // 显示全屏通知（作为保底方案）
+        // 首先尝试使用全屏通知方式启动（更可靠）
         showFullscreenNotification(context, taskId, content, hour, minute)
         
-        // 直接启动 ReminderActivity
+        // 同时尝试直接启动 Activity（作为补充）
         val intent = android.content.Intent(context, com.zhenci.app.ReminderActivity::class.java).apply {
             flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or
                     android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP or
@@ -102,6 +102,7 @@ class ReminderWorker(
             Log.d(TAG, "ReminderActivity 直接启动成功")
         } catch (e: Exception) {
             Log.e(TAG, "ReminderActivity 直接启动失败: ${e.message}")
+            // 已经通过全屏通知启动，这里不需要额外处理
         }
     }
     
