@@ -82,6 +82,10 @@ class ReminderWorker(
      * 启动 ReminderActivity 显示提醒弹窗
      */
     private fun startReminderActivity(context: Context, taskId: Long, content: String, hour: Int, minute: Int) {
+        // 首先尝试使用全屏通知方式启动（更可靠）
+        showFullscreenNotification(context, taskId, content, hour, minute)
+        
+        // 同时尝试直接启动 Activity（作为补充）
         val intent = android.content.Intent(context, com.zhenci.app.ReminderActivity::class.java).apply {
             flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or
                     android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP or
@@ -93,15 +97,12 @@ class ReminderWorker(
             putExtra("task_minute", minute)
         }
         
-        // 尝试直接启动 Activity
         try {
             context.startActivity(intent)
-            Log.d(TAG, "ReminderActivity 启动成功")
+            Log.d(TAG, "ReminderActivity 直接启动成功")
         } catch (e: Exception) {
-            Log.e(TAG, "启动 ReminderActivity 失败: ${e.message}")
-            e.printStackTrace()
-            // 失败后使用全屏通知作为备用方案
-            showFullscreenNotification(context, taskId, content, hour, minute)
+            Log.e(TAG, "ReminderActivity 直接启动失败: ${e.message}")
+            // 已经通过全屏通知启动，这里不需要额外处理
         }
     }
     
@@ -114,7 +115,8 @@ class ReminderWorker(
         // 创建启动 ReminderActivity 的 Intent
         val fullScreenIntent = android.content.Intent(context, com.zhenci.app.ReminderActivity::class.java).apply {
             flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or
-                    android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP
+                    android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                    android.content.Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS
             putExtra("task_id", taskId)
             putExtra("task_content", content)
             putExtra("task_hour", hour)
@@ -126,6 +128,16 @@ class ReminderWorker(
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        // 创建普通点击通知的 Intent（点击通知栏进入主界面）
+        val mainIntent = android.content.Intent(context, com.zhenci.app.MainActivity::class.java).apply {
+            flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or
+                    android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val mainPendingIntent = PendingIntent.getActivity(
+            context, notificationId + 1000, mainIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         val notification = NotificationCompat.Builder(context, ZhenciApplication.CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle("针刺提醒")
@@ -133,14 +145,16 @@ class ReminderWorker(
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setAutoCancel(true)
+            .setContentIntent(mainPendingIntent)
             .setFullScreenIntent(fullScreenPendingIntent, true)
             .setVibrate(longArrayOf(0, 1000, 500, 1000))
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setOngoing(true)  // 设置为持续通知，用户必须处理
             .build()
 
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.notify(notificationId, notification)
-        Log.d(TAG, "全屏通知已显示")
+        Log.d(TAG, "全屏通知已显示，notificationId=$notificationId")
     }
 
     private fun showNotification(context: Context, title: String, description: String, taskId: Long) {

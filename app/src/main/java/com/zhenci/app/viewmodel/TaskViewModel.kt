@@ -38,12 +38,23 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
     
     init {
         viewModelScope.launch {
+            refreshData()
+        }
+    }
+    
+    /**
+     * 强制刷新数据
+     */
+    fun refreshData() {
+        viewModelScope.launch {
+            android.util.Log.d("TaskViewModel", "refreshData: 开始刷新数据")
             // 检查是否需要重置每日数据
             checkAndResetDailyStats()
             // 初始化默认任务（如果数据库为空）
             initializeDefaultTasks()
             // 重新为所有启用的任务注册闹钟（修复应用重装/重启后闹钟丢失的问题）
             rescheduleAllAlarms()
+            android.util.Log.d("TaskViewModel", "refreshData: 数据刷新完成")
         }
     }
 
@@ -125,11 +136,14 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
     // 执行任务（+1分）
     fun executeTask(taskId: Long) {
         viewModelScope.launch {
+            android.util.Log.d("TaskViewModel", "executeTask: 开始执行任务 taskId=$taskId")
             // 标记任务完成
             taskDao.updateTaskCompletion(taskId, true)
+            android.util.Log.d("TaskViewModel", "executeTask: 任务已标记为完成 taskId=$taskId")
             // 增加积分
             userStatsDao.addScore(1)
             userStatsDao.incrementExecuted()
+            android.util.Log.d("TaskViewModel", "executeTask: 积分已增加 taskId=$taskId")
         }
     }
     

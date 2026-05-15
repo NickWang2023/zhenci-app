@@ -84,12 +84,16 @@ class ReminderActivity : ComponentActivity() {
                             // 执行任务：+1分，标记完成
                             android.util.Log.d("ReminderActivity", "onExecute clicked for taskId=$taskId")
                             viewModel.executeTask(taskId)
+                            // 取消通知
+                            cancelNotification(taskId)
                             showDialog = false
                             finish()
                         },
                         onClose = {
                             // 关闭任务：不加分
                             viewModel.closeTask(taskId)
+                            // 取消通知
+                            cancelNotification(taskId)
                             showDialog = false
                             finish()
                         }
@@ -116,6 +120,16 @@ class ReminderActivity : ComponentActivity() {
             "Zhenci::ReminderActivityWakeLock"
         )
         wakeLock.acquire(30000)
+    }
+
+    private fun cancelNotification(taskId: Long) {
+        try {
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+            notificationManager.cancel(taskId.toInt())
+            android.util.Log.d("ReminderActivity", "通知已取消: taskId=$taskId")
+        } catch (e: Exception) {
+            android.util.Log.e("ReminderActivity", "取消通知失败: ${e.message}")
+        }
     }
 
     override fun onBackPressed() {

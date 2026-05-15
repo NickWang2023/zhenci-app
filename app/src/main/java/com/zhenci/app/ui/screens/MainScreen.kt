@@ -38,7 +38,7 @@ sealed class Screen(val route: String, val title: String, val icon: androidx.com
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainScreen() {
+fun MainScreen(refreshTrigger: Int = 0) {
     val navController = rememberNavController()
     val items = listOf(Screen.Today, Screen.Templates, Screen.Stats, Screen.Settings)
     val context = LocalContext.current
@@ -52,6 +52,14 @@ fun MainScreen() {
             }
         }
     )
+    
+    // 当 refreshTrigger 变化时，强制刷新数据
+    LaunchedEffect(refreshTrigger) {
+        if (refreshTrigger > 0) {
+            android.util.Log.d("MainScreen", "收到刷新触发器，强制刷新数据")
+            sharedViewModel.refreshData()
+        }
+    }
 
     // 监听当前路由，判断是否显示底部导航栏
     val navBackStackEntry by navController.currentBackStackEntryAsState()
