@@ -11,31 +11,35 @@ import com.zhenci.app.ui.theme.ZhenciTheme
 
 class MainActivity : ComponentActivity() {
     
-    private var refreshTrigger by mutableIntStateOf(0)
-    
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
             ZhenciTheme {
                 var showSplash by remember { mutableStateOf(true) }
+                // 使用 remember 来跟踪刷新状态，当 Activity 恢复时会重新组合
+                var refreshTrigger by remember { mutableIntStateOf(0) }
                 
-                // 使用 refreshTrigger 强制刷新
-                val currentRefresh = remember { refreshTrigger }
+                // 监听生命周期恢复事件
+                DisposableEffect(Unit) {
+                    val lifecycleObserver = androidx.lifecycle.LifecycleEventObserver { _, event ->
+                        if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                            refreshTrigger++
+                            android.util.Log.d("MainActivity", "onResume: 触发刷新 refreshTrigger=$refreshTrigger")
+                        }
+                    }
+                    lifecycle.addObserver(lifecycleObserver)
+                    onDispose {
+                        lifecycle.removeObserver(lifecycleObserver)
+                    }
+                }
                 
                 if (showSplash) {
                     SplashScreen(onSplashFinished = { showSplash = false })
                 } else {
-                    MainScreen(refreshTrigger = currentRefresh)
+                    MainScreen(refreshTrigger = refreshTrigger)
                 }
             }
         }
-    }
-    
-    override fun onResume() {
-        super.onResume()
-        // 从其他 Activity 返回时触发刷新
-        refreshTrigger++
-        android.util.Log.d("MainActivity", "onResume: 触发刷新 refreshTrigger=$refreshTrigger")
     }
 }
