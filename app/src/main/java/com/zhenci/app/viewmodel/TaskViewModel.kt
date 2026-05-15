@@ -10,6 +10,7 @@ import com.zhenci.app.data.entity.UserStats
 import com.zhenci.app.service.AlarmScheduler
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.cancel
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -20,8 +21,18 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
     private val userStatsDao = database.userStatsDao()
     
     // 任务列表 - 只获取今日任务（templateId = 0），排除模板任务
-    val tasks: StateFlow<List<Task>> = taskDao.getTodayTasks()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    private val _tasks = MutableStateFlow<List<Task>>(emptyList())
+    val tasks: StateFlow<List<Task>> = _tasks.asStateFlow()
+    
+    // 手动刷新任务列表
+    private fun loadTasks() {
+        viewModelScope.launch {
+            taskDao.getTodayTasks().collect { taskList ->
+                _tasks.value = taskList
+                android.util.Log.d("TaskViewModel", "loadTasks: 加载了 ${taskList.size} 个任务")
+            }
+        }
+    }
     
     // 用户统计
     val userStats: StateFlow<UserStats> = userStatsDao.getUserStats()
@@ -38,6 +49,7 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
     
     init {
         viewModelScope.launch {
+            loadTasks()
             refreshData()
         }
     }
@@ -54,7 +66,10 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
             initializeDefaultTasks()
             // 重新为所有启用的任务注册闹钟（修复应用重装/重启后闹钟丢失的问题）
             rescheduleAllAlarms()
-            android.util.Log.d("TaskViewModel", "refreshData: 数据刷新完成")
+            // 强制重新加载任务列表
+            val currentTasks = taskDao.getAllTasksSync().filter { it.templateId == 0L }
+            _tasks.value = currentTasks
+            android.util.Log.d("TaskViewModel", "refreshData: 数据刷新完成，当前 ${currentTasks.size} 个任务")
         }
     }
 

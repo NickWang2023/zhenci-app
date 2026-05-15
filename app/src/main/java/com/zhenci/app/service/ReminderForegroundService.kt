@@ -69,32 +69,40 @@ class ReminderForegroundService : Service() {
             return START_NOT_STICKY
         }
 
-        // 启动前台服务
+        // 启动前台服务（必须在5秒内完成）
         startForeground(NOTIFICATION_ID, createServiceNotification(content))
+        Log.d(TAG, "前台服务已启动")
 
-        // 唤醒屏幕
-        wakeUpScreen()
-
-        // 启动 ReminderActivity 显示弹窗
-        startReminderActivity(taskId, content, hour, minute)
-
-        // 显示系统通知
-        showNotification(taskId, content)
-
-        // 播放提示音
-        playAlarmSound()
-
-        // 语音播报
+        // 在协程中执行其他操作，确保前台服务先完成
         serviceScope.launch {
+            // 唤醒屏幕
+            wakeUpScreen()
+            
+            // 延迟一点时间确保服务完全前台化
+            delay(100)
+            
+            // 显示全屏通知（作为保底方案，点击可进入弹窗）
+            showFullscreenNotification(taskId, content, hour, minute)
+            
+            // 启动 ReminderActivity 显示弹窗
+            startReminderActivity(taskId, content, hour, minute)
+            
+            // 显示系统通知
+            showNotification(taskId, content)
+            
+            // 播放提示音
+            playAlarmSound()
+            
+            // 语音播报
             speakWithTTS(content)
             
+            // 重新设置明天的闹钟
+            rescheduleForTomorrow(taskId, content, hour, minute)
+            
             // 播报完成后延迟停止服务
-            delay(5000)
+            delay(3000)
             stopSelf()
         }
-
-        // 重新设置明天的闹钟
-        rescheduleForTomorrow(taskId, content, hour, minute)
 
         return START_NOT_STICKY
     }
@@ -132,6 +140,41 @@ class ReminderForegroundService : Service() {
             Log.e(TAG, "启动 ReminderActivity 失败: ${e.message}")
             e.printStackTrace()
         }
+    }
+
+    private fun showFullscreenNotification(taskId: Long, content: String, hour: Int, minute: Int) {
+        // 创建启动 ReminderActivity 的 Intent
+        val fullScreenIntent = Intent(this, ReminderActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                    Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS
+            putExtra("task_id", taskId)
+            putExtra("task_content", content)
+            putExtra("task_hour", hour)
+            putExtra("task_minute", minute)
+        }
+        
+        val fullScreenPendingIntent = PendingIntent.getActivity(
+            this, taskId.toInt(), fullScreenIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notification = NotificationCompat.Builder(this, ZhenciApplication.CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle("针刺提醒")
+            .setContentText(content)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setAutoCancel(true)
+            .setFullScreenIntent(fullScreenPendingIntent, true)
+            .setVibrate(longArrayOf(0, 1000, 500, 1000))
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setOngoing(true)
+            .build()
+
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager.notify(taskId.toInt() + 10000, notification)
+        Log.d(TAG, "全屏通知已显示")
     }
 
     private fun showNotification(taskId: Long, content: String) {
