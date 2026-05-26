@@ -105,10 +105,12 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
     
-    // 添加任务
-    fun addTask(task: Task) {
+    // 添加任务，返回新任务id
+    fun addTask(task: Task, onTaskAdded: (Long) -> Unit = {}) {
         viewModelScope.launch {
-            taskDao.insertTask(task)
+            val newId = taskDao.insertTask(task)
+            android.util.Log.d("TaskViewModel", "addTask: 新任务已添加，id=$newId")
+            onTaskAdded(newId)
         }
     }
     

@@ -158,10 +158,13 @@ fun TodayScreen(sharedViewModel: TaskViewModel? = null) {
             task = null,
             onDismiss = { showAddDialog = false },
             onConfirm = { newTask ->
-                viewModel.addTask(newTask)
-                // 如果启用了提醒，设置闹钟
-                if (newTask.isEnabled) {
-                    alarmScheduler.scheduleTask(newTask)
+                // 使用回调获取新任务的id，然后设置闹钟
+                viewModel.addTask(newTask) { newId ->
+                    // 如果启用了提醒，使用正确的id设置闹钟
+                    if (newTask.isEnabled) {
+                        val taskWithId = newTask.copy(id = newId)
+                        alarmScheduler.scheduleTask(taskWithId)
+                    }
                 }
                 showAddDialog = false
             }
