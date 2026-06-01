@@ -8,6 +8,7 @@ import com.zhenci.app.data.database.AppDatabase
 import com.zhenci.app.data.entity.Task
 import com.zhenci.app.data.entity.UserStats
 import com.zhenci.app.service.AlarmScheduler
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.time.LocalDate

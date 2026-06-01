@@ -28,6 +28,9 @@ import com.zhenci.app.service.AlarmScheduler
 import com.zhenci.app.viewmodel.TaskViewModel
 import androidx.lifecycle.ViewModelProvider
 import android.app.Application
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 
@@ -241,7 +244,7 @@ fun TodayScreen(sharedViewModel: TaskViewModel? = null) {
             onExecute = {
                 // 执行：+1分，标记完成
                 isProcessing = true
-                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                CoroutineScope(Dispatchers.Main).launch {
                     viewModel.executeTask(reminderTask!!.id).await()
                     showReminderDialog = false
                     reminderTask = null
@@ -251,7 +254,7 @@ fun TodayScreen(sharedViewModel: TaskViewModel? = null) {
             onClose = {
                 // 关闭：不加分，仅关闭弹窗
                 isProcessing = true
-                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                CoroutineScope(Dispatchers.Main).launch {
                     viewModel.closeTask(reminderTask!!.id).await()
                     showReminderDialog = false
                     reminderTask = null
