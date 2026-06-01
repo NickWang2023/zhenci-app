@@ -15,6 +15,7 @@ import androidx.compose.ui.window.DialogProperties
 fun ReminderDialog(
     taskContent: String,
     taskTime: String,
+    isProcessing: Boolean = false,
     onExecute: () -> Unit,
     onClose: () -> Unit
 ) {
@@ -74,6 +75,7 @@ fun ReminderDialog(
                     OutlinedButton(
                         onClick = onClose,
                         modifier = Modifier.weight(1f),
+                        enabled = !isProcessing,
                         colors = ButtonDefaults.outlinedButtonColors(
                             contentColor = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -85,11 +87,20 @@ fun ReminderDialog(
                     Button(
                         onClick = onExecute,
                         modifier = Modifier.weight(1f),
+                        enabled = !isProcessing,
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.primary
                         )
                     ) {
-                        Text("执行 +1分", fontSize = 16.sp)
+                        if (isProcessing) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Text("执行 +1分", fontSize = 16.sp)
+                        }
                     }
                 }
             }

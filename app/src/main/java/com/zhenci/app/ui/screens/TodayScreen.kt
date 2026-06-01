@@ -230,22 +230,33 @@ fun TodayScreen(sharedViewModel: TaskViewModel? = null) {
         )
     }
 
-    // 提醒弹窗
+    // 提醒弹窗（备用：当直接从应用内触发时使用）
     if (showReminderDialog && reminderTask != null) {
+        var isProcessing by remember { mutableStateOf(false) }
+        
         ReminderDialog(
             taskContent = reminderTask!!.content,
             taskTime = String.format("%02d:%02d", reminderTask!!.hour, reminderTask!!.minute),
+            isProcessing = isProcessing,
             onExecute = {
                 // 执行：+1分，标记完成
-                viewModel.executeTask(reminderTask!!.id)
-                showReminderDialog = false
-                reminderTask = null
+                isProcessing = true
+                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                    viewModel.executeTask(reminderTask!!.id).await()
+                    showReminderDialog = false
+                    reminderTask = null
+                    isProcessing = false
+                }
             },
             onClose = {
                 // 关闭：不加分，仅关闭弹窗
-                viewModel.closeTask(reminderTask!!.id)
-                showReminderDialog = false
-                reminderTask = null
+                isProcessing = true
+                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                    viewModel.closeTask(reminderTask!!.id).await()
+                    showReminderDialog = false
+                    reminderTask = null
+                    isProcessing = false
+                }
             }
         )
     }

@@ -11,11 +11,11 @@ import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.runtime.*
 import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import com.zhenci.app.ui.components.ReminderDialog
 import com.zhenci.app.ui.theme.ZhenciTheme
 import com.zhenci.app.viewmodel.TaskViewModel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 /**
  * 提醒弹窗 Activity
@@ -77,25 +77,39 @@ class ReminderActivity : ComponentActivity() {
                 val timeString = String.format("%02d:%02d", taskHour, taskMinute)
 
                 if (showDialog) {
+                    var isProcessing by remember { mutableStateOf(false) }
+                    
                     ReminderDialog(
                         taskContent = taskContent,
                         taskTime = timeString,
+                        isProcessing = isProcessing,
                         onExecute = {
                             // 执行任务：+1分，标记完成
                             android.util.Log.d("ReminderActivity", "onExecute clicked for taskId=$taskId")
-                            viewModel.executeTask(taskId)
-                            // 取消通知
-                            cancelNotification(taskId)
-                            showDialog = false
-                            finish()
+                            isProcessing = true
+                            lifecycleScope.launch {
+                                // 等待任务完成（数据库更新完成）
+                                viewModel.executeTask(taskId).await()
+                                android.util.Log.d("ReminderActivity", "executeTask completed for taskId=$taskId")
+                                // 取消通知
+                                cancelNotification(taskId)
+                                showDialog = false
+                                finish()
+                            }
                         },
                         onClose = {
                             // 关闭任务：不加分
-                            viewModel.closeTask(taskId)
-                            // 取消通知
-                            cancelNotification(taskId)
-                            showDialog = false
-                            finish()
+                            android.util.Log.d("ReminderActivity", "onClose clicked for taskId=$taskId")
+                            isProcessing = true
+                            lifecycleScope.launch {
+                                // 等待关闭操作完成
+                                viewModel.closeTask(taskId).await()
+                                android.util.Log.d("ReminderActivity", "closeTask completed for taskId=$taskId")
+                                // 取消通知
+                                cancelNotification(taskId)
+                                showDialog = false
+                                finish()
+                            }
                         }
                     )
                 }

@@ -54,8 +54,24 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
             initializeDefaultTasks()
             // 重新为所有启用的任务注册闹钟（修复应用重装/重启后闹钟丢失的问题）
             rescheduleAllAlarms()
+            // 强制刷新任务列表 - 触发 Flow 重新发射
+            refreshTasks()
             android.util.Log.d("TaskViewModel", "refreshData: 数据刷新完成")
         }
+    }
+    
+    /**
+     * 强制刷新任务列表
+     * 通过查询数据库并手动触发 Flow 更新
+     */
+    private suspend fun refreshTasks() {
+        android.util.Log.d("TaskViewModel", "refreshTasks: 强制刷新任务列表")
+        // 查询最新任务数据，Flow 会自动发射新值
+        val latestTasks = taskDao.getAllTasksSync()
+        android.util.Log.d("TaskViewModel", "refreshTasks: 获取到 ${latestTasks.size} 个任务")
+        // 检查是否有已完成的任务
+        val completedCount = latestTasks.count { it.isCompleted }
+        android.util.Log.d("TaskViewModel", "refreshTasks: 已完成任务数: $completedCount")
     }
 
     /**
@@ -135,9 +151,9 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
     
-    // 执行任务（+1分）
-    fun executeTask(taskId: Long) {
-        viewModelScope.launch {
+    // 执行任务（+1分）- 返回 Deferred 以便调用者可以等待完成
+    fun executeTask(taskId: Long): kotlinx.coroutines.Deferred<Unit> {
+        return viewModelScope.async {
             android.util.Log.d("TaskViewModel", "executeTask: 开始执行任务 taskId=$taskId")
             // 标记任务完成
             taskDao.updateTaskCompletion(taskId, true)
@@ -149,9 +165,9 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
     
-    // 关闭任务（不加分，任务保持原样，只记录关闭次数）
-    fun closeTask(taskId: Long) {
-        viewModelScope.launch {
+    // 关闭任务（不加分，任务保持原样，只记录关闭次数）- 返回 Deferred 以便调用者可以等待完成
+    fun closeTask(taskId: Long): kotlinx.coroutines.Deferred<Unit> {
+        return viewModelScope.async {
             // 只增加关闭计数，不修改任务完成状态
             userStatsDao.incrementClosed()
             // 任务保持原样（isCompleted = false）
