@@ -166,12 +166,16 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
     
-    // 关闭任务（不加分，任务保持原样，只记录关闭次数）- 返回 Deferred 以便调用者可以等待完成
+    // 关闭任务（不加分，但标记为完成，只记录关闭次数）- 返回 Deferred 以便调用者可以等待完成
     fun closeTask(taskId: Long): kotlinx.coroutines.Deferred<Unit> {
         return viewModelScope.async {
-            // 只增加关闭计数，不修改任务完成状态
+            android.util.Log.d("TaskViewModel", "closeTask: 开始关闭任务 taskId=$taskId")
+            // 标记任务完成（有划线显示）
+            taskDao.updateTaskCompletion(taskId, true)
+            android.util.Log.d("TaskViewModel", "closeTask: 任务已标记为完成 taskId=$taskId")
+            // 增加关闭计数
             userStatsDao.incrementClosed()
-            // 任务保持原样（isCompleted = false）
+            android.util.Log.d("TaskViewModel", "closeTask: 关闭计数已增加 taskId=$taskId")
         }
     }
     
