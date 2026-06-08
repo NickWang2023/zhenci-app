@@ -65,24 +65,9 @@ jobs:
         
         echo "=== Gradle Wrapper Setup Complete ==="
         
-    - name: Generate Release Keystore
+    - name: Build Debug APK
       run: |
-        echo "=== Generating Release Keystore ==="
-        keytool -genkey -v \
-          -keystore zhenci-release.jks \
-          -keyalg RSA \
-          -keysize 2048 \
-          -validity 10000 \
-          -alias zhenci \
-          -dname "CN=Zhenci App, OU=Development, O=Minglong, L=Beijing, ST=Beijing, C=CN" \
-          -storepass zhenci123 \
-          -keypass zhenci123
-        echo "=== Keystore Generated ==="
-        ls -la zhenci-release.jks
-        
-    - name: Build Release APK
-      run: |
-        ./gradlew :app:assembleRelease --no-daemon --stacktrace 2>&1 | tee build.log
+        ./gradlew :app:assembleDebug --no-daemon --stacktrace 2>&1 | tee build.log
         BUILD_EXIT_CODE=${PIPESTATUS[0]}
         echo "Build exit code: $BUILD_EXIT_CODE"
         exit $BUILD_EXIT_CODE
@@ -90,11 +75,11 @@ jobs:
     - name: Verify APK Signature
       run: |
         echo "=== APK Output Directory ==="
-        ls -la app/build/outputs/apk/release/ 2>/dev/null || echo "Directory not found"
+        ls -la app/build/outputs/apk/debug/ 2>/dev/null || echo "Directory not found"
         echo ""
         
         echo "=== Checking APK Signature ==="
-        for apk in app/build/outputs/apk/release/*.apk; do
+        for apk in app/build/outputs/apk/debug/*.apk; do
           if [ -f "$apk" ]; then
             echo "Checking: $apk"
             echo "-- APK Info:"
@@ -115,7 +100,7 @@ jobs:
         echo "=== Looking for APK files ==="
         find . -name "*.apk" -type f 2>/dev/null || echo "No APK files found"
         echo "=== APK directory ==="
-        ls -la app/build/outputs/apk/release/ 2>/dev/null || echo "Directory not found"
+        ls -la app/build/outputs/apk/debug/ 2>/dev/null || echo "Directory not found"
       
     - name: Upload build log
       uses: actions/upload-artifact@v4
@@ -125,10 +110,10 @@ jobs:
         path: build.log
         if-no-files-found: ignore
       
-    - name: Upload Release APK
+    - name: Upload Debug APK
       uses: actions/upload-artifact@v4
       if: success()
       with:
-        name: zhenci-release-apk
-        path: app/build/outputs/apk/release/*.apk
+        name: zhenci-debug-apk
+        path: app/build/outputs/apk/debug/*.apk
         if-no-files-found: error
