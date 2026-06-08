@@ -81,10 +81,6 @@ jobs:
         ls -la zhenci-release.jks
         
     - name: Build Release APK
-      env:
-        RELEASE_STORE_PASSWORD: zhenci123
-        RELEASE_KEY_PASSWORD: zhenci123
-        RELEASE_KEY_ALIAS: zhenci
       run: |
         ./gradlew :app:assembleRelease --no-daemon --stacktrace 2>&1 | tee build.log
         BUILD_EXIT_CODE=${PIPESTATUS[0]}
