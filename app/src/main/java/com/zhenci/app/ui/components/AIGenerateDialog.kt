@@ -11,7 +11,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.zhenci.app.data.entity.AIConfig
 import com.zhenci.app.data.repository.AIConfigRepository
 import com.zhenci.app.service.AIService
 import kotlinx.coroutines.launch
