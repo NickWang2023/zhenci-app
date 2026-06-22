@@ -5,12 +5,13 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FileUpload
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -24,6 +25,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.zhenci.app.data.entity.Template
 import com.zhenci.app.viewmodel.TaskViewModel
 import com.zhenci.app.viewmodel.TemplateViewModel
+import com.zhenci.app.ui.components.AIGenerateDialog
+import com.zhenci.app.ui.components.AIResultPreviewDialog
+import com.zhenci.app.service.AIService
 import android.app.Application
 import android.widget.Toast
 
@@ -55,6 +59,13 @@ fun TemplatesScreen(
     var deletingTemplate by remember { mutableStateOf<Template?>(null) }
     var showApplyConfirm by remember { mutableStateOf(false) }
     var applyingTemplate by remember { mutableStateOf<Template?>(null) }
+    
+    // AI生成对话框状态
+    var showAIGenerateDialog by remember { mutableStateOf(false) }
+    var showAIResultDialog by remember { mutableStateOf(false) }
+    var generatedTemplateName by remember { mutableStateOf("") }
+    var generatedDescription by remember { mutableStateOf("") }
+    var generatedTasks by remember { mutableStateOf<List<AIService.GeneratedTask>>(emptyList()) }
 
     Scaffold(
         topBar = {
@@ -71,6 +82,13 @@ fun TemplatesScreen(
                 horizontalAlignment = Alignment.End,
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                // AI生成按钮
+                SmallFloatingActionButton(
+                    onClick = { showAIGenerateDialog = true },
+                    containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                ) {
+                    Icon(Icons.Default.AutoAwesome, contentDescription = "AI生成模板")
+                }
                 SmallFloatingActionButton(
                     onClick = { showImportDialog = true }
                 ) {
@@ -271,6 +289,51 @@ fun TemplatesScreen(
                     applyingTemplate = null
                     isProcessing = false
                 }
+            }
+        )
+    }
+    
+    // AI生成对话框
+    if (showAIGenerateDialog) {
+        AIGenerateDialog(
+            onDismiss = { showAIGenerateDialog = false },
+            onScheduleGenerated = { name, desc, tasks ->
+                generatedTemplateName = name
+                generatedDescription = desc
+                generatedTasks = tasks
+                showAIGenerateDialog = false
+                showAIResultDialog = true
+            }
+        )
+    }
+    
+    // AI结果预览对话框
+    if (showAIResultDialog) {
+        AIResultPreviewDialog(
+            templateName = generatedTemplateName,
+            description = generatedDescription,
+            tasks = generatedTasks,
+            onDismiss = { showAIResultDialog = false },
+            onConfirm = {
+                // 创建模板和任务
+                viewModel.addTemplate(
+                    name = generatedTemplateName,
+                    description = generatedDescription,
+                    tasks = generatedTasks.map { task ->
+                        com.zhenci.app.data.entity.Task(
+                            id = 0,
+                            content = task.content,
+                            description = task.description,
+                            hour = task.hour,
+                            minute = task.minute,
+                            isEnabled = true,
+                            isCompleted = false,
+                            templateId = 0
+                        )
+                    }
+                )
+                showAIResultDialog = false
+                Toast.makeText(context, "AI模板已创建成功", Toast.LENGTH_SHORT).show()
             }
         )
     }

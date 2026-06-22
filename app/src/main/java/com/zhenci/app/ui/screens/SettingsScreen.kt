@@ -3,6 +3,7 @@ package com.zhenci.app.ui.screens
 import android.content.Intent
 import android.speech.tts.TextToSpeech
 import android.util.Log
+import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -11,21 +12,30 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.SmartToy
+import androidx.compose.material.icons.filled.Key
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.zhenci.app.data.entity.AIProvider
+import com.zhenci.app.data.repository.AIConfigRepository
 import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen() {
     val context = LocalContext.current
+    val aiConfigRepository = remember { AIConfigRepository(context) }
+    
     var notificationsEnabled by remember { mutableStateOf(true) }
     var voiceEnabled by remember { mutableStateOf(true) }
     var volume by remember { mutableStateOf(0.8f) }
     var ttsStatus by remember { mutableStateOf("未测试") }
+    
+    // AI配置对话框状态
+    var showAIConfigDialog by remember { mutableStateOf(false) }
     
     // TTS 测试
     val tts = remember { 
@@ -122,6 +132,37 @@ fun SettingsScreen() {
 
             Divider()
             
+            // AI 设置
+            SettingsSection(title = "AI 设置") {
+                val hasApiKey = aiConfigRepository.hasApiKey()
+                ListItem(
+                    headlineContent = { Text("AI 模板生成") },
+                    supportingContent = { 
+                        Text(if (hasApiKey) "已配置 API Key" else "未配置 API Key") 
+                    },
+                    leadingContent = {
+                        Icon(Icons.Default.SmartToy, contentDescription = null)
+                    },
+                    trailingContent = {
+                        if (hasApiKey) {
+                            Icon(
+                                imageVector = Icons.Default.CheckCircle,
+                                contentDescription = "已配置",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                )
+                Button(
+                    onClick = { showAIConfigDialog = true },
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                ) {
+                    Text(if (hasApiKey) "修改 AI 配置" else "配置 AI")
+                }
+            }
+
+            Divider()
+            
             // TTS 测试
             SettingsSection(title = "语音测试") {
                 ListItem(
@@ -170,6 +211,14 @@ fun SettingsScreen() {
                     Text("打开系统 TTS 设置")
                 }
             }
+            
+            // AI配置对话框
+            if (showAIConfigDialog) {
+                AIConfigDialog(
+                    repository = aiConfigRepository,
+                    onDismiss = { showAIConfigDialog = false }
+                )
+            }
 
             Divider()
 
@@ -205,4 +254,147 @@ fun SettingsSection(
         )
         content()
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AIConfigDialog(
+    repository: AIConfigRepository,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val currentConfig = remember { repository.getConfig() }
+    
+    var selectedProvider by remember { mutableStateOf(currentConfig.provider) }
+    var apiKey by remember { mutableStateOf(currentConfig.apiKey) }
+    var model by remember { mutableStateOf(currentConfig.model) }
+    var baseUrl by remember { mutableStateOf(currentConfig.baseUrl) }
+    var showApiKey by remember { mutableStateOf(false) }
+    
+    // 当切换provider时更新默认值
+    LaunchedEffect(selectedProvider) {
+        if (model.isBlank() || model == AIProvider.KIMI.getDefaultModel() || model == AIProvider.OPENAI.getDefaultModel()) {
+            model = selectedProvider.getDefaultModel()
+        }
+        if (baseUrl.isBlank() || baseUrl == AIProvider.KIMI.getDefaultBaseUrl() || baseUrl == AIProvider.OPENAI.getDefaultBaseUrl()) {
+            baseUrl = selectedProvider.getDefaultBaseUrl()
+        }
+    }
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("AI 配置") },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // 提供商选择
+                Text(
+                    text = "选择 AI 提供商",
+                    style = MaterialTheme.typography.labelMedium
+                )
+                
+                AIProvider.entries.forEach { provider ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        RadioButton(
+                            selected = selectedProvider == provider,
+                            onClick = { selectedProvider = provider }
+                        )
+                        Text(
+                            text = provider.displayName,
+                            modifier = Modifier.align(androidx.compose.ui.Alignment.CenterVertically)
+                        )
+                    }
+                }
+                
+                Divider()
+                
+                // API Key
+                OutlinedTextField(
+                    value = apiKey,
+                    onValueChange = { apiKey = it },
+                    label = { Text("API Key") },
+                    singleLine = true,
+                    visualTransformation = if (showApiKey) {
+                        androidx.compose.ui.text.input.VisualTransformation.None
+                    } else {
+                        androidx.compose.ui.text.input.PasswordVisualTransformation()
+                    },
+                    trailingIcon = {
+                        IconButton(onClick = { showApiKey = !showApiKey }) {
+                            Icon(
+                                imageVector = if (showApiKey) {
+                                    androidx.compose.material.icons.filled.Visibility
+                                } else {
+                                    androidx.compose.material.icons.filled.VisibilityOff
+                                },
+                                contentDescription = if (showApiKey) "隐藏" else "显示"
+                            )
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                
+                // 模型
+                OutlinedTextField(
+                    value = model,
+                    onValueChange = { model = it },
+                    label = { Text("模型名称") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                
+                // Base URL（自定义时显示）
+                if (selectedProvider == AIProvider.CUSTOM) {
+                    OutlinedTextField(
+                        value = baseUrl,
+                        onValueChange = { baseUrl = it },
+                        label = { Text("Base URL") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                
+                // 说明文字
+                Text(
+                    text = when (selectedProvider) {
+                        AIProvider.KIMI -> "推荐使用 Kimi，国内访问稳定。获取 API Key: https://platform.moonshot.cn"
+                        AIProvider.OPENAI -> "需要 OpenAI API Key。注意：国内访问可能需要代理"
+                        AIProvider.CUSTOM -> "支持任何 OpenAI 兼容格式的 API"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val config = com.zhenci.app.data.entity.AIConfig(
+                        provider = selectedProvider,
+                        apiKey = apiKey.trim(),
+                        model = model.trim(),
+                        baseUrl = baseUrl.trim()
+                    )
+                    repository.saveConfig(config)
+                    Toast.makeText(context, "AI 配置已保存", Toast.LENGTH_SHORT).show()
+                    onDismiss()
+                },
+                enabled = apiKey.isNotBlank()
+            ) {
+                Text("保存")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("取消")
+            }
+        }
+    )
 }
