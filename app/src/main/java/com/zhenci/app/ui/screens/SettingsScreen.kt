@@ -8,12 +8,15 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -330,9 +333,9 @@ fun AIConfigDialog(
                         IconButton(onClick = { showApiKey = !showApiKey }) {
                             Icon(
                                 imageVector = if (showApiKey) {
-                                    androidx.compose.material.icons.filled.Visibility
+                                    Icons.Default.Visibility
                                 } else {
-                                    androidx.compose.material.icons.filled.VisibilityOff
+                                    Icons.Default.VisibilityOff
                                 },
                                 contentDescription = if (showApiKey) "隐藏" else "显示"
                             )
