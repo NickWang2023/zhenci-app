@@ -322,8 +322,11 @@ fun TemplatesScreen(
                     tasks = generatedTasks.map { task ->
                         com.zhenci.app.data.entity.Task(
                             id = 0,
-                            content = task.content,
-                            description = task.description,
+                            content = if (task.description.isNotBlank()) {
+                                "${task.content} (${task.description})"
+                            } else {
+                                task.content
+                            },
                             hour = task.hour,
                             minute = task.minute,
                             isEnabled = true,
