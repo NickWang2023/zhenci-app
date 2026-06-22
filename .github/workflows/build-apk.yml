@@ -50,11 +50,13 @@ jobs:
         zipStorePath=wrapper/dists
         EOF
         
-        # 下载 wrapper jar
+        # 下载 wrapper jar (使用官方gradle wrapper jar)
         curl -L -o gradle/wrapper/gradle-wrapper.jar \
-          "https://raw.githubusercontent.com/gradle/gradle/v8.5.0/gradle/wrapper/gradle-wrapper.jar"
+          "https://raw.githubusercontent.com/gradle/gradle/v8.5.0/gradle/wrapper/gradle-wrapper.jar" || \
+        curl -L -o gradle/wrapper/gradle-wrapper.jar \
+          "https://github.com/gradle/gradle/raw/v8.5.0/gradle/wrapper/gradle-wrapper.jar"
         
-        # 创建正确的 gradlew 脚本
+        # 创建 gradlew 脚本
         cat > gradlew << 'SCRIPT'
         #!/bin/sh
         APP_HOME=$(cd "$(dirname "$0")" && pwd)
@@ -64,9 +66,19 @@ jobs:
         chmod +x gradlew
         
         echo "=== Gradle Wrapper Setup Complete ==="
+        ls -la gradle/wrapper/
+        head -5 gradlew
         
     - name: Build Debug APK
       run: |
+        # 设置JAVA_HOME（确保使用正确的JDK）
+        export JAVA_HOME=$JAVA_HOME_17_X64
+        export PATH=$JAVA_HOME/bin:$PATH
+        
+        echo "=== Java Version ==="
+        java -version
+        
+        echo "=== Starting Build ==="
         ./gradlew :app:assembleDebug --no-daemon --stacktrace 2>&1 | tee build.log
         BUILD_EXIT_CODE=${PIPESTATUS[0]}
         echo "Build exit code: $BUILD_EXIT_CODE"
