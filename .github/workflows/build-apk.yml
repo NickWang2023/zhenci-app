@@ -49,72 +49,32 @@ jobs:
         zipStorePath=wrapper/dists
         EOF
         
-        # 下载 wrapper jar（使用多个备用源）
-        curl -L --retry 3 --retry-delay 2 -o gradle/wrapper/gradle-wrapper.jar \
-          "https://raw.githubusercontent.com/gradle/gradle/v8.5.0/gradle/wrapper/gradle-wrapper.jar" || \
-        curl -L --retry 3 --retry-delay 2 -o gradle/wrapper/gradle-wrapper.jar \
-          "https://github.com/gradle/gradle/raw/v8.5.0/gradle/wrapper/gradle-wrapper.jar" || \
-        curl -L --retry 3 --retry-delay 2 -o gradle/wrapper/gradle-wrapper.jar \
-          "https://services.gradle.org/distributions/gradle-8.5-wrapper.jar"
+        # 下载 wrapper jar
+        curl -L --retry 3 -o gradle/wrapper/gradle-wrapper.jar \
+          "https://raw.githubusercontent.com/gradle/gradle/v8.5.0/gradle/wrapper/gradle-wrapper.jar"
         
-        # 验证wrapper jar是否下载成功
-        if [ ! -f "gradle/wrapper/gradle-wrapper.jar" ]; then
-          echo "ERROR: Failed to download gradle-wrapper.jar"
-          exit 1
-        fi
+        # 验证下载
+        ls -la gradle/wrapper/
         
-        ls -la gradle/wrapper/gradle-wrapper.jar
-        
-        # 创建 gradlew 脚本（使用sh兼容语法）
-        cat > gradlew << 'GRADLEW'
+        # 创建 gradlew 脚本
+        cat > gradlew << 'EOF'
         #!/bin/sh
         APP_HOME="$(cd "$(dirname "$0")" && pwd)"
         exec java -Xmx2048m -Xms512m -classpath "$APP_HOME/gradle/wrapper/gradle-wrapper.jar" org.gradle.wrapper.GradleWrapperMain "$@"
-        GRADLEW
+        EOF
         
         chmod +x gradlew
-        
-        echo "=== Gradle Wrapper Setup Complete ==="
-        ls -la gradlew
-        head -3 gradlew
+        cat gradlew
 
     - name: Build Debug APK
       run: |
         export JAVA_HOME=$JAVA_HOME_17_X64
         export PATH=$JAVA_HOME/bin:$PATH
         
-        echo "=== Java Version ==="
         java -version
-        
-        echo "=== Gradle Wrapper Version ==="
         ./gradlew --version
-        
-        echo "=== Starting Build ==="
         ./gradlew :app:assembleDebug --no-daemon --stacktrace 2>&1 | tee build.log
-        BUILD_EXIT_CODE=${PIPESTATUS[0]}
-        echo "Build exit code: $BUILD_EXIT_CODE"
-        exit $BUILD_EXIT_CODE
-        
-    - name: Verify APK Signature
-      if: success()
-      run: |
-        echo "=== APK Output Directory ==="
-        ls -la app/build/outputs/apk/debug/ 2>/dev/null || echo "Directory not found"
-        echo ""
-        
-        echo "=== Checking APK Signature ==="
-        for apk in app/build/outputs/apk/debug/*.apk; do
-          if [ -f "$apk" ]; then
-            echo "Checking: $apk"
-            echo "-- APK Info:"
-            ls -lh "$apk"
-            echo "-- Signature files in META-INF:"
-            unzip -l "$apk" | grep -E "META-INF/.*\.(RSA|DSA|EC|SF|MF)" || echo "WARNING: No signature files found!"
-            echo "-- Verifying APK signature with apksigner:"
-            $ANDROID_SDK_ROOT/build-tools/34.0.0/apksigner verify --verbose "$apk" 2>&1 || echo "WARNING: apksigner verification failed"
-            echo ""
-          fi
-        done
+        exit ${PIPESTATUS[0]}
         
     - name: Show build results
       if: always()
@@ -122,9 +82,7 @@ jobs:
         echo "=== BUILD LOG (last 200 lines) ==="
         tail -200 build.log
         echo "=== END LOG ==="
-        echo "=== Looking for APK files ==="
         find . -name "*.apk" -type f 2>/dev/null || echo "No APK files found"
-        echo "=== APK directory ==="
         ls -la app/build/outputs/apk/debug/ 2>/dev/null || echo "Directory not found"
       
     - name: Upload build log
