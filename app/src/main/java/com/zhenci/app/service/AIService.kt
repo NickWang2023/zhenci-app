@@ -88,7 +88,7 @@ class AIService(private val config: AIConfig) {
         val workDaysStr = request.workDays.joinToString("、")
         
         return """
-你是一个专业的日程规划助手。请根据以下用户信息，生成一个$workDaysStr的日程模板。
+你是一个专业的日程规划助手。请根据以下用户信息，生成一个${workDaysStr}的日程模板。
 
 用户信息：
 - 职业/身份：${request.profession}
