@@ -52,13 +52,25 @@
             android:enabled="true"
             android:exported="true" />
 
-        <!-- Boot Receiver -->
+        <!-- Boot Receiver：开机 / 跨零点 / 改时间 / 改时区 / 应用更新后全量重排每日闹钟 -->
         <receiver
             android:name=".service.BootReceiver"
             android:enabled="true"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.DATE_CHANGED" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.TIME_SET" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
 

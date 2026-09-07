@@ -66,9 +66,6 @@ class ReminderWorker(
             // 使用 TTS 直接播报（挂起等待完成）
             speakWithTTSSuspend(applicationContext, message)
             
-            // 重新设置明天的闹钟（用于每日重复任务）
-            rescheduleForTomorrow(taskId, content)
-            
             return Result.success()
         } catch (e: Exception) {
             e.printStackTrace()
@@ -353,26 +350,6 @@ class ReminderWorker(
             }
         } catch (e: Exception) {
             Log.e(TAG, "speakWithTTSSuspend: 异常: ${e.message}")
-        }
-    }
-
-    private fun rescheduleForTomorrow(taskId: Long, content: String) {
-        try {
-            val scheduler = AlarmScheduler(applicationContext)
-            // 直接使用传入的 taskId 和 content，以及 hour/minute
-            val hour = inputData.getInt("task_hour", 9)
-            val minute = inputData.getInt("task_minute", 0)
-
-            val task = com.zhenci.app.data.entity.Task(
-                id = taskId,
-                content = content,
-                hour = hour,
-                minute = minute,
-                isEnabled = true
-            )
-            scheduler.scheduleDailyRepeating(task)
-        } catch (e: Exception) {
-            e.printStackTrace()
         }
     }
 }
