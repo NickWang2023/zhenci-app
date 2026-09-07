@@ -22,19 +22,24 @@ android {
     }
 
     signingConfigs {
-        getByName("debug") {
-            // 使用默认debug签名
-        }
-        create("release") {
-            storeFile = file("zhenci-release.jks")
+        // 项目内置统一 keystore（zhenci-debug.jks，已提交到仓库）：
+        // debug 与 release 共用同一证书，避免依赖 CI/本机自动生成的 ~/.android/debug.keystore
+        // （该默认 key 在纯净 runner 上常缺失/不可识别，导致产出的 APK “未包含任何证书”无法安装）。
+        // 显式开启 V1+V2(+V3) 签名，确保 Android 各版本都能识别证书。
+        create("zhenci") {
+            storeFile = file("zhenci-debug.jks")
             storePassword = "zhenci123"
             keyAlias = "zhenci"
             keyPassword = "zhenci123"
+            enableV1Signing = true
+            enableV2Signing = true
+            enableV3Signing = true
         }
     }
 
     buildTypes {
         debug {
+            signingConfig = signingConfigs.getByName("zhenci")
             isDebuggable = true
         }
         release {
@@ -43,7 +48,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("release")
+            signingConfig = signingConfigs.getByName("zhenci")
         }
     }
     compileOptions {

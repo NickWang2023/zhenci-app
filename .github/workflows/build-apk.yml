@@ -93,9 +93,18 @@ jobs:
         path: build.log
         if-no-files-found: ignore
       
-    - name: Upload Debug APK
-      uses: actions/upload-artifact@v4
+    - name: Verify Debug APK signature
       if: success()
+      run: |
+        APK=$(find app/build/outputs/apk/debug -name "*.apk" | head -1)
+        echo "APK=$APK"
+        BT=$(ls -d $ANDROID_HOME/build-tools/* 2>/dev/null | sort -V | tail -1)
+        echo "build-tools=$BT"
+        "$BT/apksigner" verify --print-certs "$APK" 2>&1 || echo "APKSIGNER_VERIFY_FAILED"
+
+    - name: Upload Debug APK
+      if: success()
+      uses: actions/upload-artifact@v4
       with:
         name: zhenci-debug-apk
         path: app/build/outputs/apk/debug/*.apk
