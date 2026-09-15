@@ -22,7 +22,9 @@ jobs:
         distribution: 'temurin'
         
     - name: Setup Android SDK
-      uses: android-actions/setup-android@v3
+      uses: android-actions/setup-android@v4
+      with:
+        packages: 'platforms;android-34 build-tools;34.0.0 platform-tools'
       
     - name: Cache Gradle packages
       uses: actions/cache@v4
@@ -36,35 +38,24 @@ jobs:
 
     - name: Setup Gradle Wrapper
       run: |
+        # 只补 wrapper jar（.properties 已随仓库提交）；本地 gradlew 也已修复并在仓库中。
+        # 兜底：若仓库的 gradlew 缺失/不可执行，则重建一个最小启动脚本。
         mkdir -p gradle/wrapper
-        
-        # 创建 gradle-wrapper.properties
-        cat > gradle/wrapper/gradle-wrapper.properties << 'EOF'
-        distributionBase=GRADLE_USER_HOME
-        distributionPath=wrapper/dists
-        distributionUrl=https\://services.gradle.org/distributions/gradle-8.5-bin.zip
-        networkTimeout=10000
-        validateDistributionUrl=true
-        zipStoreBase=GRADLE_USER_HOME
-        zipStorePath=wrapper/dists
-        EOF
-        
-        # 下载 wrapper jar
-        curl -L --retry 3 -o gradle/wrapper/gradle-wrapper.jar \
-          "https://raw.githubusercontent.com/gradle/gradle/v8.5.0/gradle/wrapper/gradle-wrapper.jar"
-        
-        # 验证下载
+        if [ ! -f gradle/wrapper/gradle-wrapper.jar ]; then
+          curl -fL --retry 5 --retry-all-errors --connect-timeout 20 --max-time 120 \
+            -o gradle/wrapper/gradle-wrapper.jar \
+            "https://raw.githubusercontent.com/gradle/gradle/v8.5.0/gradle/wrapper/gradle-wrapper.jar"
+        fi
         ls -la gradle/wrapper/
-        
-        # 创建 gradlew 脚本
-        cat > gradlew << 'EOF'
+        if [ ! -x ./gradlew ]; then
+          cat > gradlew << 'EOF'
         #!/bin/sh
         APP_HOME="$(cd "$(dirname "$0")" && pwd)"
         exec java -Xmx2048m -Xms512m -classpath "$APP_HOME/gradle/wrapper/gradle-wrapper.jar" org.gradle.wrapper.GradleWrapperMain "$@"
         EOF
-        
-        chmod +x gradlew
-        cat gradlew
+          chmod +x gradlew
+        fi
+        head -3 gradlew
 
     - name: Build Debug APK
       run: |
@@ -80,7 +71,7 @@ jobs:
       if: always()
       run: |
         echo "=== BUILD LOG (last 200 lines) ==="
-        tail -200 build.log
+        tail -200 build.log 2>/dev/null || echo "(no build.log)"
         echo "=== END LOG ==="
         find . -name "*.apk" -type f 2>/dev/null || echo "No APK files found"
         ls -la app/build/outputs/apk/debug/ 2>/dev/null || echo "Directory not found"
