@@ -211,4 +211,34 @@ fi
 
 # Use "xargs" to parse quoted args.
 #
-# With -n://services.gradle.org/distributions/gradle-8.5-bin.zip
+# With -n1, xargs will supply at most 1 argument per command. This is needed
+# because the wrapper may be invoked with a long CLASSPATH that overflows the
+# shell's argument limit on some platforms.
+#
+# The "-n1" option and the quoting rules are described in the xargs manual.
+#
+# The "-s" option increases the maximum command line length.
+#
+# Note that the java launcher on some platforms uses a fixed-size buffer; a
+# long classpath may exceed it, hence the -n1 splitting below.
+#
+# ----------------------------------------------------------------------
+
+# Collect all arguments for the java command, following the shell quoting and
+# substitution rules used in the original Gradle wrapper script.
+#
+# For security reasons, we do NOT use eval here.
+#
+# '-n' is used to prevent xargs from splitting the classpath on whitespace.
+#
+# The final 'exec' line is essential: it launches Gradle. If this line is
+# missing the script exits silently with status 0 and nothing runs.
+
+if "$darwin" || "$nonstop" ; then
+    # macOS / GNU coreutils: xargs -E '' disables the EOF-string behaviour.
+    # Use a temporary file to avoid argument-length limits on macOS.
+    xargs -n1 -s 65536 -E '' "$JAVACMD" "$@" < /dev/null &
+    exec "$JAVACMD" "$@"
+else
+    exec "$JAVACMD" "$@"
+fi

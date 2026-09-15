@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.util.Log
+import com.zhenci.app.MainActivity
 import com.zhenci.app.data.entity.Task
 import java.util.Calendar
 
@@ -50,21 +51,52 @@ class AlarmScheduler(private val context: Context) {
         // 因 PendingIntent 用 (context, requestCode, intent) 三元组区分，这里 task.id 保证唯一即可。
         val pendingIntent = buildPendingIntent(task)
 
-        // Android 12+ 需精确闹钟权限，否则降级为非精确 setAndAllowWhileIdle（会有些许漂移但可接受）。
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (alarmManager.canScheduleExactAlarms()) {
-                alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
-            } else {
-                alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
-            }
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
+        // ------------------------------------------------------------------
+        // 【关键修复：用 setAlarmClock 替代 setExactAndAllowWhileIdle，根治“接连补播”】
+        //
+        // 旧实现用 setExactAndAllowWhileIdle：在 Doze / 省电模式下，系统对「idle 精确闹钟」
+        // 有【每应用约 9 分钟一次的限流】。当多条日程挨得较近、或某次因省电被推迟时，
+        // 后续闹钟会被系统串行延后并排队，等设备一旦退出 Doze（用户点亮/解锁开始正常用手机）
+        // 就【一次性集中释放】→ 表现为“浏览手机时突然接连播报之前到点、没播的若干条”。
+        //
+        // setAlarmClock 是系统认定的「闹钟」类调度，享有 Doze 豁免：不被 9 分钟限流，
+        // 且会点亮屏幕、显示状态栏闹钟图标，到点即触发，这是 Google 官方对闹钟类 App 的推荐做法。
+        // 同时保留 setExactAndAllowWhileIdle / setAndAllowWhileIdle 作为权限缺失时的降级路径。
+        // ------------------------------------------------------------------
+        val canExact = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            alarmManager.canScheduleExactAlarms()
         } else {
-            alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
+            true
         }
 
-        // setExactAndAllowWhileIdle 同一 PendingIntent 只保留一个闹钟，天然覆盖旧排程。
-        Log.d(TAG, "scheduleTask: 任务 ${task.id}「${task.content}」已排下一次 ${formatTime(triggerAt)}（每日重复）")
+        if (canExact) {
+            try {
+                // showIntent 用于点击状态栏闹钟图标回到主界面；与提醒 PendingIntent 分开，避免互相覆盖。
+                val showIntent = PendingIntent.getActivity(
+                    context,
+                    (task.id.toInt() + 10000),
+                    Intent(context, MainActivity::class.java).apply {
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                    },
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+                alarmManager.setAlarmClock(
+                    AlarmManager.AlarmClockInfo(triggerAt, showIntent),
+                    pendingIntent
+                )
+                Log.d(TAG, "scheduleTask: 任务 ${task.id}「${task.content}」已用 setAlarmClock 排下一次 ${formatTime(triggerAt)}（每日重复，Doze 豁免）")
+            } catch (e: Exception) {
+                // 极端情况下 setAlarmClock 不可用（部分定制 ROM），降级为精确 idle 闹钟。
+                Log.w(TAG, "scheduleTask: setAlarmClock 失败，降级 setExactAndAllowWhileIdle: ${e.message}")
+                alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
+            }
+        } else {
+            // 无精确闹钟权限：只能非精确，会有漂移，但至少不会丢。
+            Log.w(TAG, "scheduleTask: 无精确闹钟权限，降级 setAndAllowWhileIdle（可能漂移）")
+            alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
+        }
+
+        // 同一 PendingIntent 只保留一个闹钟，天然覆盖旧排程。
     }
 
     /**

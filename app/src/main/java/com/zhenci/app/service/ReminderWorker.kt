@@ -19,6 +19,7 @@ import androidx.work.WorkerParameters
 import com.zhenci.app.MainActivity
 import com.zhenci.app.ZhenciApplication
 import kotlinx.coroutines.delay
+import java.util.concurrent.atomic.AtomicLong
 import java.util.*
 
 class ReminderWorker(
@@ -28,6 +29,16 @@ class ReminderWorker(
 
     companion object {
         private const val TAG = "ReminderWorker"
+
+        /**
+         * 【串行播报闸门】
+         * 旧实现下多个 Worker 可能同时被 WorkManager 并行启动（系统解除 Doze 时集中触发），
+         * 各自独立播放闹钟音 + TTS，导致“接连播报”、声音互相打断。
+         * 这里用一个全局时间戳保证：任意两次语音播报之间至少间隔 GAP_MS，
+         * 后到的 Worker 等待前一次播完再开始，做到有序、不重叠。
+         */
+        private val lastSpeakEndAt = AtomicLong(0L)
+        private const val MIN_GAP_MS = 4000L
     }
 
     override suspend fun doWork(): Result {
@@ -36,7 +47,23 @@ class ReminderWorker(
         val hour = inputData.getInt("task_hour", 0)
         val minute = inputData.getInt("task_minute", 0)
         Log.d(TAG, "doWork: 开始执行任务 $taskId - $content at $hour:$minute")
-        
+
+        // ------------------------------------------------------------------
+        // 【过期补播抑制】
+        // 若本次提醒对应的“计划时刻”已经过去很久（闹钟被 Doze/省电推迟），
+        // 不再强行补播——否则多条堆积的旧日程会在用户正在用手机时集中炸响。
+        // 阈值 5 分钟：超过即视为“过期”，只静默置一条通知，不播 TTS/闹钟音。
+        // 这是治标层；治本已在 AlarmScheduler 改用 setAlarmClock（Doze 豁免）。
+        // ------------------------------------------------------------------
+        val scheduledAt = computeScheduledMillis(hour, minute)
+        val lateByMs = System.currentTimeMillis() - scheduledAt
+        val STALE_THRESHOLD_MS = 5 * 60 * 1000L
+        if (lateByMs > STALE_THRESHOLD_MS) {
+            Log.w(TAG, "doWork: 任务 $taskId 已过期 ${lateByMs / 1000}s（>5min），跳过语音补播，仅留通知")
+            showNotification(applicationContext, "针刺提醒（已过期 ${lateByMs / 60000} 分钟）", content, taskId)
+            return Result.success()
+        }
+
         // 唤醒屏幕
         val powerManager = applicationContext.getSystemService(Context.POWER_SERVICE) as PowerManager
         val wakeLock = powerManager.newWakeLock(
@@ -58,13 +85,27 @@ class ReminderWorker(
             
             // 播放提示音
             playAlarmSound(applicationContext)
-            
+
+            // ------------------------------------------------------------------
+            // 串行闸门：保证上一段 TTS 播完后至少间隔 MIN_GAP_MS 再播下一条，
+            // 避免多条堆积日程同时解锁时声音重叠/互相打断。
+            // ------------------------------------------------------------------
+            val now = System.currentTimeMillis()
+            val waitUntil = lastSpeakEndAt.get() + MIN_GAP_MS
+            if (waitUntil > now) {
+                val waitMs = waitUntil - now
+                Log.d(TAG, "doWork: 任务 $taskId 排队等待 ${waitMs}ms 以避开上一条播报")
+                delay(waitMs)
+            }
+
             // 语音播报 - 直接使用 TTS
             val message = content.take(50) // 增加到50字
             Log.d(TAG, "doWork: 准备语音播报，消息: $message")
             
             // 使用 TTS 直接播报（挂起等待完成）
             speakWithTTSSuspend(applicationContext, message)
+            // 记录本次播报结束时刻，供后续 Worker 排队
+            lastSpeakEndAt.set(System.currentTimeMillis())
             
             return Result.success()
         } catch (e: Exception) {
@@ -186,6 +227,20 @@ class ReminderWorker(
 
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.notify(notificationId, notification)
+    }
+
+    /**
+     * 计算本次提醒“本应触发”的时刻（今天该时刻；若今天该时刻尚未到则仍取今天）。
+     * 用于判断迟播程度：now - scheduledAt 即“晚了多久”。
+     */
+    private fun computeScheduledMillis(hour: Int, minute: Int): Long {
+        val c = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, hour)
+            set(Calendar.MINUTE, minute)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        return c.timeInMillis
     }
 
     private fun playAlarmSound(context: Context) {
