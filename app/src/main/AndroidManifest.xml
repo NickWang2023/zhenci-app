@@ -47,10 +47,12 @@
             android:turnScreenOn="true" />
 
         <!-- Alarm Receiver -->
+        <!-- 安全修复：原 exported=true 且无 intent-filter，任意第三方 App 可伪造广播，
+             借假 task_id 覆盖真实任务的闹钟或弹假提醒。仅本 App 的 PendingIntent 触发。 -->
         <receiver
             android:name=".service.AlarmReceiver"
             android:enabled="true"
-            android:exported="true" />
+            android:exported="false" />
 
         <!-- Boot Receiver：开机 / 跨零点 / 改时间 / 改时区 / 应用更新后全量重排每日闹钟 -->
         <receiver

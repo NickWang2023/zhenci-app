@@ -12,8 +12,8 @@ android {
         applicationId = "com.zhenci.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 19
-        versionName = "1.0.19"
+        versionCode = 20
+        versionName = "1.0.20"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -31,6 +31,12 @@ android {
             storePassword = "zhenci123"
             keyAlias = "zhenci"
             keyPassword = "zhenci123"
+            // 强制 V1/V2/V3 全部开启。
+            // 关键：AGP 默认在 minSdk >= 24 时会关闭 V1（JAR）签名，只留 V2/V3。
+            // 但部分国产 ROM / 侧载安装器（应用市场、文件管理器、微信安装）只认 V1，
+            // 于是 APK 明明签了却报「未包含任何证书 / 解析包出错」。
+            // 这就是历史上反复出现的"无证书"问题根源。
+            // 这里显式开启全部三种签名方案，覆盖各版本安装器。
             enableV1Signing = true
             enableV2Signing = true
             enableV3Signing = true
@@ -60,6 +66,9 @@ android {
     }
     buildFeatures {
         compose = true
+        // 安全修复依赖 BuildConfig.DEBUG 来区分 debug/release 的网络日志级别
+        // （release 必须 NONE，否则 apiKey 会进 logcat）。AGP 8+ 默认不再生成，需显式开启。
+        buildConfig = true
     }
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.8"

@@ -94,6 +94,10 @@ class AlarmScheduler(private val context: Context) {
             // 无精确闹钟权限：只能非精确，会有漂移，但至少不会丢。
             Log.w(TAG, "scheduleTask: 无精确闹钟权限，降级 setAndAllowWhileIdle（可能漂移）")
             alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
+            // 【修复：静默降级 -> 显式告知用户】
+            // Android 12+ 用户可在系统设置关闭「闹钟和提醒」，系统升级也可能重置该权限。
+            // 旧实现只打一条 Log.w，界面毫无提示，用户以为提醒准时，实际可能晚一小时。
+            ExactAlarmPermission.notifyDegraded(context)
         }
 
         // 同一 PendingIntent 只保留一个闹钟，天然覆盖旧排程。

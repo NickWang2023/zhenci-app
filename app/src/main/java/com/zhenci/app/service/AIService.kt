@@ -3,6 +3,7 @@ package com.zhenci.app.service
 import android.util.Log
 import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
+import com.zhenci.app.BuildConfig
 import com.zhenci.app.data.entity.AIConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -26,8 +27,16 @@ class AIService(private val config: AIConfig) {
     private val gson = Gson()
     
     private val client by lazy {
+        // 安全修复：Level.BODY 会把 Authorization: Bearer <apiKey> 明文写进 logcat，
+        // 且该 interceptor 挂在正式 client 上、release 也生效，等于向任何能读日志的
+        // 应用/调试工具泄露用户密钥。改为仅 debug 输出元信息，永不打印 headers/body。
         val logging = HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BODY
+            level = if (BuildConfig.DEBUG) {
+                HttpLoggingInterceptor.Level.BASIC
+            } else {
+                HttpLoggingInterceptor.Level.NONE
+            }
+            redactHeader("Authorization")
         }
         
         OkHttpClient.Builder()

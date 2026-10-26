@@ -233,12 +233,25 @@ class ReminderWorker(
      * 计算本次提醒“本应触发”的时刻（今天该时刻；若今天该时刻尚未到则仍取今天）。
      * 用于判断迟播程度：now - scheduledAt 即“晚了多久”。
      */
+    /**
+     * 本次提醒的计划时刻，用于过期补播判断。
+     *
+     * 【跨零点修复】旧实现直接取【今天】的 hour:min，不区分这是「今天要响的」还是
+     * 「昨晚被推迟到今天的」。于是 23:58 的任务在次日 00:03 触发时算出 lateByMs
+     * 约等于 -23h55m，永远不满足 > 5 分钟阈值，过期抑制完全失效并全额补播——
+     * 这正是历史「集中补播」的复现路径。
+     *
+     * 现在：若「今天的 hour:min」晚于当前时刻，说明计划的是【昨天】那一轮，回退一天。
+     */
     private fun computeScheduledMillis(hour: Int, minute: Int): Long {
         val c = Calendar.getInstance().apply {
             set(Calendar.HOUR_OF_DAY, hour)
             set(Calendar.MINUTE, minute)
             set(Calendar.SECOND, 0)
             set(Calendar.MILLISECOND, 0)
+        }
+        if (c.timeInMillis > System.currentTimeMillis()) {
+            c.add(Calendar.DAY_OF_YEAR, -1)
         }
         return c.timeInMillis
     }
